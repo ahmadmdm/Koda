@@ -1,5 +1,6 @@
 import CarPlay
 import MediaPlayer
+import Observation
 import UIKit
 
 /// Koda in the car: an audio app with Home, Library, Recents and Explore tabs, and the system
@@ -21,6 +22,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         tabBar = tabs
         interfaceController.setRootTemplate(tabs, animated: false, completion: nil)
         configureNowPlaying()
+        observeLibrary()
         Task { await loadHome() }
         Task { await loadExplore() }
     }
@@ -42,14 +44,14 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     }
 
     private func libraryTab() -> CPListTemplate {
-        let t = CPListTemplate(title: String(localized: "Library"), sections: librarySections())
+        // Filled by `refreshLibraryTabs`.
+        let t = CPListTemplate(title: String(localized: "Library"), sections: [])
         t.tabImage = UIImage(systemName: "music.note.square.stack.fill")
         return t
     }
 
     private func recentsTab() -> CPListTemplate {
-        let songs = Array(library.recentSongs.prefix(40))
-        let t = CPListTemplate(title: String(localized: "History"), sections: [CPListSection(items: songItems(songs))])
+        let t = CPListTemplate(title: String(localized: "History"), sections: [])
         t.tabImage = UIImage(systemName: "clock.fill")
         t.emptyViewTitleVariants = [String(localized: "No history")]
         return t
@@ -108,6 +110,34 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             CPListSection(items: cardItems(Array($0.items.prefix(10))), header: $0.title, sectionIndexTitle: nil)
         }
         template(titled: "Explore")?.updateSections(Array(sections))
+    }
+
+    private var lastLibraryState = ""
+
+    /// Rebuilds Library and History whenever the library or the song playing changes, then watches again.
+    private func observeLibrary() {
+        guard tabBar != nil else { return }
+        withObservationTracking {
+            refreshLibraryTabs()
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeLibrary() }
+        }
+    }
+
+    private func refreshLibraryTabs() {
+        // The library changes every few seconds while a play is recorded: rebuild only for what the tabs show.
+        let data = library.data
+        let state = [
+            "\(data.plays.count)|\(data.plays.last?.song.id ?? "")",
+            "\(data.likedSongs.count)|\(data.downloads.count)",
+            data.playlists.map { "\($0.name)\($0.songs.count)" }.joined(separator: ","),
+            (data.savedCollections + data.followedArtists).map(\.id).joined(separator: ","),
+            player.current?.id ?? "",
+        ].joined(separator: "|")
+        guard state != lastLibraryState else { return }
+        lastLibraryState = state
+        template(titled: "Library")?.updateSections(librarySections())
+        template(titled: "History")?.updateSections([CPListSection(items: songItems(Array(library.recentSongs.prefix(40))))])
     }
 
     private func librarySections() -> [CPListSection] {
@@ -261,10 +291,13 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     nonisolated func nowPlayingTemplateUpNextButtonTapped(_ nowPlayingTemplate: CPNowPlayingTemplate) {
         MainActor.assumeIsolated {
             let upNext = player.upNext
-            let items = upNext.prefix(CPListTemplate.maximumItemCount).enumerated().map { i, song -> CPListItem in
+            let items = upNext.prefix(CPListTemplate.maximumItemCount).map { song -> CPListItem in
                 let item = CPListItem(text: song.title, detailText: song.artist, image: placeholderImage())
                 item.handler = { [weak self] _, completion in
-                    self?.player.jump(toUpNext: i)
+                    // The queue may have moved on since this list was built: find the song again.
+                    if let self, let offset = self.player.upNext.firstIndex(where: { $0.id == song.id }) {
+                        self.player.jump(toUpNext: offset)
+                    }
                     self?.interfaceController?.popTemplate(animated: true, completion: nil)
                     completion()
                 }

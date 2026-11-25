@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct QueueView: View {
+    /// True when the queue is its own sheet, so the playlist sheet has to be presented from here.
+    var presentsAddToPlaylist = false
     @Environment(MusicPlayer.self) private var player
     @Environment(AppState.self) private var app
     @Environment(\.dismiss) private var dismiss
@@ -32,6 +34,7 @@ struct QueueView: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .environment(\.editMode, .constant(.active))
+            .addToPlaylistPresenter(isActive: presentsAddToPlaylist)
             .navigationTitle("Queue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -129,6 +132,7 @@ struct LyricsPanel: View {
                     Image(systemName: "slider.horizontal.3").frame(width: 40, height: 40)
                 }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
+                .accessibilityLabel("Lyrics Options")
                 .padding(.trailing, 16)
             }
         }

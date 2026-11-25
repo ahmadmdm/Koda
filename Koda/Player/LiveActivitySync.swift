@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import UIKit
 
 /// Starts, updates and ends the music Live Activity. Called from `WidgetSync`, so it follows every
 /// song change, play, pause, seek and stop. Progress runs on the clock in the widget, so the activity
@@ -29,7 +30,13 @@ enum LiveActivitySync {
             guard changed(from: previous, to: state) else { return }
             lastState = state
             let id = activity.id
-            Task { await send(id, ActivityContent(state: state, staleDate: nil)) }
+            // A pause from a widget or CarPlay leaves the app without audio, so iOS may suspend it
+            // before the update reaches the system: keep it awake until the update is sent.
+            let background = UIApplication.shared.beginBackgroundTask(withName: "Live Activity")
+            Task {
+                await send(id, content(state))
+                UIApplication.shared.endBackgroundTask(background)
+            }
             return
         }
         activity = nil
@@ -37,7 +44,13 @@ enum LiveActivitySync {
         // Start when music starts or the song changes, not again right after the user dismissed it.
         guard state.isPlaying, previous == nil || previous?.songId != state.songId || previous?.isPlaying == false else { return }
         activity = try? Activity.request(attributes: NowPlayingActivityAttributes(),
-                                         content: ActivityContent(state: state, staleDate: nil), pushType: nil)
+                                         content: content(state), pushType: nil)
+    }
+
+    /// While playing, the activity goes stale when the song should have ended: if the app was closed
+    /// meanwhile, nothing else would tell the system it stopped.
+    private static func content(_ state: State) -> ActivityContent<State> {
+        ActivityContent(state: state, staleDate: state.isPlaying ? state.endDate : nil)
     }
 
     /// `WidgetSync` wrote the App Group artwork for this song.

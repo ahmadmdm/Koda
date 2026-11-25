@@ -23,6 +23,8 @@ final class LocalMusicLibrary {
     private(set) var isScanning = false
 
     @ObservationIgnored private var index: [String: Entry] = [:]
+    /// A rescan was asked for while one ran: files may have arrived after it listed the folder.
+    @ObservationIgnored private var rescanRequested = false
 
     nonisolated struct Entry: Codable, Sendable {
         var song: Song
@@ -96,9 +98,16 @@ final class LocalMusicLibrary {
 
     /// Matches the folder: adds new files, re-reads changed ones and forgets removed ones.
     func rescan() async {
-        guard !isScanning else { return }
+        guard !isScanning else { rescanRequested = true; return }
         isScanning = true
         defer { isScanning = false }
+        repeat {
+            rescanRequested = false
+            await scan()
+        } while rescanRequested
+    }
+
+    private func scan() async {
         let fm = FileManager.default
         let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]
         let files = (try? fm.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])) ?? []

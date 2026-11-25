@@ -29,9 +29,9 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            if matches("account sign in google youtube login حساب تسجيل") { AccountSection() }
-            if matches("last.fm lastfm scrobble scrobbling") { LastFmSection() }
-            if matches("language arabic english اللغة العربية") {
+            if matches(.account) { AccountSection() }
+            if matches(.lastFm) { LastFmSection() }
+            if matches(.language) {
                 Section {
                     LabeledContent("App language", value: Locale.current.localizedString(forLanguageCode: Bundle.main.preferredLocalizations.first ?? "en") ?? "")
                     Button("Change in iOS Settings", systemImage: "globe") {
@@ -41,7 +41,7 @@ struct SettingsView: View {
                     Text("Choose Arabic or English for Koda in the iOS Settings app; the layout follows the language, right to left for Arabic.")
                 }
             }
-            if matches("appearance theme dark light color palette accent") {
+            if matches(.appearance) {
                 Section("Appearance") {
                     Picker("Theme", selection: $appearance) {
                         Text("System").tag("system"); Text("Light").tag("light"); Text("Dark").tag("dark")
@@ -74,7 +74,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            if matches("player style ambient background live activity dynamic island lock screen") {
+            if matches(.player) {
                 Section("Player") {
                     Picker("Player style", selection: $playerStyle) {
                         ForEach(PlayerStyle.allCases) { Label($0.title, systemImage: $0.icon).tag($0.rawValue) }
@@ -84,7 +84,7 @@ struct SettingsView: View {
                         .onChange(of: liveActivity) { LiveActivitySync.update(MusicPlayer.shared) }
                 }
             }
-            if matches("playback quality normalise normalize volume preload stream download") {
+            if matches(.playback) {
                 Section {
                     Picker("Streaming quality", selection: $musicQuality) { Text("High (AAC 128 kbps)").tag("high"); Text("Data saver (48 kbps)").tag("low") }
                     Picker("Download quality", selection: $downloadQuality) { Text("High").tag("high"); Text("Saver").tag("saver") }
@@ -92,7 +92,7 @@ struct SettingsView: View {
                     Toggle("Preload upcoming songs", isOn: $preload)
                 } header: { Text("Music playback") } footer: { Text("Normalise volume uses the loudness YouTube reports for each song.") }
             }
-            if matches("video autoplay sponsorblock sponsor quality subtitles captions") {
+            if matches(.video) {
                 Section {
                     Toggle("Autoplay next video", isOn: $videoAutoplay)
                     Toggle("SponsorBlock", isOn: $sponsorBlock)
@@ -102,7 +102,7 @@ struct SettingsView: View {
                     }
                 } header: { Text("Video") } footer: { Text("SponsorBlock skips sponsored segments using the community database at sponsor.ajay.app.") }
             }
-            if matches("content region language country") {
+            if matches(.content) {
                 Section("Content") {
                     Picker("Region", selection: $region) {
                         ForEach(["US", "GB", "SA", "AE", "EG", "KW", "QA", "IN", "DE", "FR", "JP", "KR", "BR", "TR"], id: \.self) { code in
@@ -116,14 +116,14 @@ struct SettingsView: View {
                     NavigationLink(value: Route.hidden) { Text("Hidden & blocked") }
                 }
             }
-            if matches("storage downloads cache history clear") {
+            if matches(.storage) {
                 Section("Storage") {
                     LabeledContent("Downloads", value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))
                     NavigationLink(value: Route.downloads) { Text("Manage downloads") }
                     Button("Clear listening & watch history", role: .destructive) { confirmClear = true }
                 }
             }
-            if matches("backup restore export import") {
+            if matches(.backup) {
                 Section {
                     Button("Back up library…", systemImage: "square.and.arrow.up") {
                         backupURL = try? library.exportBackup()
@@ -133,7 +133,7 @@ struct SettingsView: View {
                     Text("Backups include playlists, likes, saved items, statistics, history, subscriptions and hidden items. Downloaded media is not included.")
                 }
             }
-            if matches("about version licence license github diagnostics crash hang report") {
+            if matches(.about) {
                 Section("About") {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
                     NavigationLink { DiagnosticsView() } label: { Text("Diagnostics") }
@@ -142,6 +142,11 @@ struct SettingsView: View {
                     Text("Koda is not affiliated with YouTube or Google. Streams are fetched directly from YouTube without an API key.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+            }
+        }
+        .overlay {
+            if !query.isEmpty && !SettingsGroup.allCases.contains(where: matches) {
+                ContentUnavailableView.search(text: query)
             }
         }
         .readableContentWidth()
@@ -164,8 +169,50 @@ struct SettingsView: View {
         .alert("Restore failed", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) { Button("OK") {} } message: { Text(message ?? "") }
     }
 
-    private func matches(_ keywords: String) -> Bool {
-        query.isEmpty || keywords.localizedCaseInsensitiveContains(query) || query.split(separator: " ").allSatisfy { keywords.localizedCaseInsensitiveContains($0) }
+    /// Matches the query against a group's English keywords and its titles in the app's language,
+    /// so searching in Arabic finds what the screen shows in Arabic.
+    private func matches(_ group: SettingsGroup) -> Bool {
+        guard !query.isEmpty else { return true }
+        let text = group.keywords + " " + group.titles.map { String(localized: $0) }.joined(separator: " ")
+        return text.localizedStandardContains(query) || query.split(separator: " ").allSatisfy { text.localizedStandardContains($0) }
+    }
+}
+
+/// The Settings sections, with what search looks at for each.
+private enum SettingsGroup: CaseIterable {
+    case account, lastFm, language, appearance, player, playback, video, content, storage, backup, about
+
+    var keywords: String {
+        switch self {
+        case .account: "account sign in google youtube login حساب تسجيل"
+        case .lastFm: "last.fm lastfm scrobble scrobbling"
+        case .language: "language arabic english اللغة العربية"
+        case .appearance: "appearance theme dark light color palette accent"
+        case .player: "player style ambient background live activity dynamic island lock screen"
+        case .playback: "playback quality normalise normalize volume preload stream download"
+        case .video: "video autoplay sponsorblock sponsor quality subtitles captions"
+        case .content: "content region language country"
+        case .storage: "storage downloads cache history clear"
+        case .backup: "backup restore export import"
+        case .about: "about version licence license github diagnostics crash hang report"
+        }
+    }
+
+    /// The section title and the rows' titles, as shown on screen.
+    var titles: [String.LocalizationValue] {
+        switch self {
+        case .account: ["Account", "Sign in with Google", "Sign out", "Add another account"]
+        case .lastFm: ["Last.fm", "Scrobble songs"]
+        case .language: ["Language", "App language", "Change in iOS Settings"]
+        case .appearance: ["Appearance", "Theme", "Colour palette", "Home layout", "Haptics"]
+        case .player: ["Player", "Player style", "Ambient artwork background", "Live Activity"]
+        case .playback: ["Music playback", "Streaming quality", "Download quality", "Normalise volume", "Preload upcoming songs"]
+        case .video: ["Video", "Autoplay next video", "SponsorBlock", "Turn on subtitles automatically", "Default video quality"]
+        case .content: ["Content", "Region", "Content language", "Hidden & blocked"]
+        case .storage: ["Storage", "Downloads", "Manage downloads", "Clear listening & watch history"]
+        case .backup: ["Backup", "Back up library…", "Restore from backup…"]
+        case .about: ["About", "Version", "Diagnostics"]
+        }
     }
 }
 

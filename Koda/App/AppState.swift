@@ -8,7 +8,11 @@ enum AppTab: Hashable { case home, library, subscriptions, settings, search }
 @Observable
 final class AppState {
     var mode: AppMode = AppMode(rawValue: UserDefaults.standard.string(forKey: "appMode") ?? "music") ?? .music {
-        didSet { UserDefaults.standard.set(mode.rawValue, forKey: "appMode") }
+        didSet {
+            UserDefaults.standard.set(mode.rawValue, forKey: "appMode")
+            // Music mode has no Subscriptions tab.
+            if mode == .music && tab == .subscriptions { tab = .home }
+        }
     }
     var tab: AppTab = .home
     var paths: [AppTab: NavigationPath] = [.home: NavigationPath(), .library: NavigationPath(), .subscriptions: NavigationPath(), .settings: NavigationPath(), .search: NavigationPath()]
@@ -33,8 +37,9 @@ final class AppState {
 
     func navigate(_ route: Route) {
         showPlayer = false
+        shorts = nil
         VideoPlayerModel.shared.isPresented = false
-        if tab == .settings { tab = .home }
+        if tab == .settings || (tab == .subscriptions && mode == .music) { tab = .home }
         paths[tab, default: NavigationPath()].append(route)
     }
 
@@ -53,10 +58,29 @@ final class AppState {
         Task { try? await Task.sleep(for: .seconds(2)); if toast == text { toast = nil } }
     }
 
+    /// Closes the Shorts pager and the watch page; true when either was showing.
+    @discardableResult
+    func closeVideoCovers() -> Bool {
+        let wasShowing = shorts != nil || VideoPlayerModel.shared.isPresented
+        shorts = nil
+        VideoPlayerModel.shared.isPresented = false
+        return wasShowing
+    }
+
+    /// Runs `present` once a full-screen cover that is being dismissed has gone, so the next one
+    /// is not presented behind it.
+    func afterCoverDismissal(_ wasShowing: Bool, _ present: @escaping @MainActor () -> Void) {
+        guard wasShowing else { present(); return }
+        Task { try? await Task.sleep(for: .milliseconds(500)); present() }
+    }
+
     /// Opens shared YouTube / YouTube Music links (watch, youtu.be, shorts, playlist, channel).
     func open(url: URL) {
         if url.scheme == "koda", url.host == "nowplaying" {
-            if MusicPlayer.shared.current != nil { mode = .music; showPlayer = true }
+            if MusicPlayer.shared.current != nil {
+                mode = .music
+                afterCoverDismissal(closeVideoCovers()) { self.showPlayer = true }
+            }
             return
         }
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -73,18 +97,22 @@ final class AppState {
         }
         if let v = query["v"] ?? (host.contains("youtu.be") ? parts.first : nil) ?? (parts.first == "shorts" || parts.first == "live" ? parts.dropFirst().first : nil) {
             if isMusic || mode == .music {
+                let wasShowing = closeVideoCovers()
                 Task {
                     let info = try? await InnerTube.shared.player(videoId: v)
-                    let song = Song(id: v, title: info?.title ?? "Song", artist: info?.author ?? "",
+                    let song = Song(id: v, title: info?.title ?? String(localized: "Song"), artist: info?.author ?? "",
                                     duration: info.map { Int($0.duration) }, thumbnail: info?.thumbnail)
                     MusicPlayer.shared.play([song], radio: true)
-                    showPlayer = true
+                    afterCoverDismissal(wasShowing) { self.showPlayer = true }
                 }
             } else {
-                VideoPlayerModel.shared.open(Video(id: v, title: "", channel: ""))
+                let wasShowing = shorts != nil || showPlayer
+                shorts = nil
+                showPlayer = false
+                afterCoverDismissal(wasShowing) { VideoPlayerModel.shared.open(Video(id: v, title: "", channel: "")) }
             }
         } else if let list = query["list"] {
-            if isMusic { mode = .music; navigate(.playlist(list)) } else { navigate(.videoPlaylist(list, "Playlist")) }
+            if isMusic { mode = .music; navigate(.playlist(list)) } else { navigate(.videoPlaylist(list, String(localized: "Playlist"))) }
         } else if parts.first == "channel", let id = parts.dropFirst().first {
             if isMusic { navigate(.artist(id)) } else { mode = .video; navigate(.channel(id)) }
         } else if parts.first == "browse", let id = parts.dropFirst().first {

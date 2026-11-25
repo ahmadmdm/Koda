@@ -12,7 +12,8 @@ final class DownloadManager {
 
     var active: [String: State] = [:]
     var pending: [Song] = []
-    @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
+    /// Each download's task, with a token so a finished task never clears a newer one for the same song.
+    @ObservationIgnored private var tasks: [String: (token: UUID, task: Task<Void, Never>)] = [:]
 
     static let directory: URL = {
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Downloads", isDirectory: true)
@@ -34,12 +35,13 @@ final class DownloadManager {
         for song in songs where !song.isLocal && !isDownloaded(song.id) && active[song.id] == nil {
             active[song.id] = .queued
             pending.append(song)
-            tasks[song.id] = Task { await self.run(song) }
+            let token = UUID()
+            tasks[song.id] = (token, Task { await self.run(song, token: token) })
         }
     }
 
     func cancel(_ id: String) {
-        tasks[id]?.cancel(); tasks[id] = nil
+        tasks[id]?.task.cancel(); tasks[id] = nil
         active[id] = nil; pending.removeAll { $0.id == id }
     }
 
@@ -54,13 +56,13 @@ final class DownloadManager {
 
     var totalBytes: Int64 { library.data.downloads.reduce(0) { $0 + $1.bytes } }
 
-    private func run(_ song: Song) async {
+    private func run(_ song: Song, token: UUID) async {
+        let fileName = "\(song.id).m4a"
+        let target = Self.directory.appendingPathComponent(fileName)
         do {
             let quality = UserDefaults.standard.string(forKey: "downloadQuality") ?? "high"
             let info = try await InnerTube.shared.player(videoId: song.id)
             guard let url = quality == "saver" ? (info.lowAudioURL ?? info.audioURL) : info.audioURL else { throw InnerTubeError.noStream }
-            let fileName = "\(song.id).m4a"
-            let target = Self.directory.appendingPathComponent(fileName)
             let bytes = try await Self.fetchRanged(url, userAgent: InnerTube.userAgent(for: url), progress: { progress in
                 Task { @MainActor in if self.active[song.id] != nil { self.active[song.id] = .downloading(progress) } }
             }, to: target)
@@ -70,12 +72,15 @@ final class DownloadManager {
             library.data.downloads.insert(DownloadedSong(song: saved, fileName: fileName, bytes: bytes, date: .now), at: 0)
             active[song.id] = nil
             pending.removeAll { $0.id == song.id }
-        } catch is CancellationError {
-            active[song.id] = nil
         } catch {
-            active[song.id] = .failed(error.localizedDescription)
+            // A cancelled request throws URLError.cancelled rather than CancellationError.
+            let cancelled = Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled
+            if cancelled { try? FileManager.default.removeItem(at: target.appendingPathExtension("part")) }
+            // A newer download of this song (after a cancel and a new start) owns its state now.
+            guard tasks[song.id]?.token == token else { return }
+            active[song.id] = cancelled ? nil : .failed(error.localizedDescription)
         }
-        tasks[song.id] = nil
+        if tasks[song.id]?.token == token { tasks[song.id] = nil }
     }
 
     nonisolated static func fetchRanged(_ url: URL, userAgent: String = InnerTube.visionUA, progress: @Sendable @escaping (Double) -> Void, to target: URL) async throws -> Int64 {

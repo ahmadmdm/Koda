@@ -30,15 +30,28 @@ struct NowPlayingProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<NowPlayingEntry>) -> Void) {
         let entry = current() ?? NowPlayingEntry(date: .now, snapshot: nil, artwork: nil)
-        // While a song plays, look again when it should end; the app also reloads on every change.
-        let refresh = entry.snapshot.flatMap { $0.isPlaying ? $0.endDate : nil } ?? .now.addingTimeInterval(3600)
-        completion(Timeline(entries: [entry], policy: .after(refresh)))
+        var entries = [entry]
+        // While a song plays, show it stopped once it should have ended: the app reloads on every
+        // change, so a song still "playing" past its end means the app was closed.
+        if let snapshot = entry.snapshot, snapshot.isPlaying {
+            entries.append(NowPlayingEntry(date: snapshot.endDate, snapshot: Self.stopped(snapshot), artwork: entry.artwork))
+        }
+        completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(3600))))
     }
 
     private func current() -> NowPlayingEntry? {
-        guard let snapshot = NowPlayingSnapshot.load() else { return nil }
-        let artwork = NowPlayingSnapshot.artworkURL.flatMap { UIImage(contentsOfFile: $0.path) }
+        guard var snapshot = NowPlayingSnapshot.load() else { return nil }
+        if snapshot.isPlaying, Date.now > snapshot.endDate { snapshot = Self.stopped(snapshot) }
+        // Only the artwork of this song: the file may still hold the previous song's.
+        let artwork = snapshot.hasArtwork ? NowPlayingSnapshot.artworkURL.flatMap { UIImage(contentsOfFile: $0.path) } : nil
         return NowPlayingEntry(date: .now, snapshot: snapshot, artwork: artwork)
+    }
+
+    private static func stopped(_ snapshot: NowPlayingSnapshot) -> NowPlayingSnapshot {
+        var stopped = snapshot
+        stopped.isPlaying = false
+        stopped.elapsed = snapshot.duration
+        return stopped
     }
 }
 
@@ -237,8 +250,12 @@ struct MediumView: View {
                         Image(systemName: snapshot.isLiked ? "heart.fill" : "heart")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(snapshot.isLiked ? .pink : .white.opacity(0.8))
+                            // A bare symbol is too small to hit with a finger.
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .padding(-8)
                 }
                 Spacer(minLength: 0)
                 SongProgress(snapshot: snapshot)

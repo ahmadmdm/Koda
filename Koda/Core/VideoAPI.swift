@@ -223,9 +223,22 @@ nonisolated enum VideoAPI {
             handle: parts.first { $0.hasPrefix("@") },
             avatar: header["image"].bestThumbnail ?? root.path("metadata.channelMetadataRenderer.avatar").bestThumbnail,
             banner: header["banner"].bestThumbnail,
-            subscribers: parts.first { $0.localizedCaseInsensitiveContains("subscriber") },
+            subscribers: subscriberPart(parts),
             description: root.path("metadata.channelMetadataRenderer.description").string,
             videos: videos.map { var v = $0; if v.channel.isEmpty { v.channel = name }; v.channelId = v.channelId ?? channelId; return v })
+    }
+
+    /// The subscriber count among a channel header's metadata parts, in whatever language YouTube answered:
+    /// a part that names subscribers, else the first part with digits after the handle that is not the video count
+    /// (the header lists the handle, then subscribers, then videos).
+    static func subscriberPart(_ parts: [String]) -> String? {
+        let words = ["subscriber", "مشترك"]
+        if let named = parts.first(where: { p in words.contains { p.localizedCaseInsensitiveContains($0) } }) { return named }
+        let videoWords = ["video", "فيديو"]
+        return parts.first { p in
+            !p.hasPrefix("@") && p.unicodeScalars.contains { CharacterSet.decimalDigits.contains($0) }
+                && !videoWords.contains { p.localizedCaseInsensitiveContains($0) }
+        }
     }
 
     /// Public RSS feed of a channel: the subscriptions feed for local follows, without an account.
@@ -238,8 +251,9 @@ nonisolated enum VideoAPI {
     static func playlist(_ playlistId: String) async throws -> (String, [Video]) {
         let id = playlistId.hasPrefix("VL") ? playlistId : "VL" + playlistId
         let root = try await api.web("browse", ["browseId": id])
-        let title = root.path("metadata.playlistMetadataRenderer.title").string ?? root.first("pageHeaderViewModel")["title"].text ?? "Playlist"
-        let videos = root.findAll("playlistVideoRenderer").compactMap(parseVideoRenderer)
+        let title = root.path("metadata.playlistMetadataRenderer.title").string ?? root.first("pageHeaderViewModel")["title"].text ?? String(localized: "Playlist")
+        var seen = Set<String>()
+        let videos = root.findAll("playlistVideoRenderer").compactMap(parseVideoRenderer).filter { seen.insert($0.id).inserted }
         return (title, videos)
     }
 

@@ -59,6 +59,7 @@ struct CollectionView: View {
                 Menu {
                     Picker("Sort", selection: $sort) { ForEach(SongSort.allCases) { Text($0.title).tag($0) } }
                 } label: { Image(systemName: "arrow.up.arrow.down") }
+                .accessibilityLabel("Sort")
             }
         }
     }

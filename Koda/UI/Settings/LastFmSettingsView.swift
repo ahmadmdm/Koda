@@ -15,7 +15,7 @@ struct LastFmSection: View {
                 LabeledContent("Signed in as", value: user)
                 Toggle("Scrobble songs", isOn: $scrobbler.enabled)
                 if scrobbler.pendingCount > 0 {
-                    LabeledContent("Waiting to send", value: "\(scrobbler.pendingCount)")
+                    LabeledContent("Waiting to send", value: scrobbler.pendingCount.formatted())
                     Button("Send now", systemImage: "arrow.up.circle") { scrobbler.flush() }
                 }
                 Button("Sign out of Last.fm", role: .destructive) { scrobbler.signOut() }

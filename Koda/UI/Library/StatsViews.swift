@@ -39,9 +39,9 @@ struct StatsView: View {
                 .pickerStyle(.segmented).listRowBackground(Color.clear)
             Section {
                 HStack {
-                    stat("\(Int(seconds / 60))", "minutes")
-                    stat("\(library.plays(since: since).count)", "plays")
-                    stat("\(Set(library.plays(since: since).map(\.song.id)).count)", "songs")
+                    stat(Int(seconds / 60).formatted(), "minutes")
+                    stat(library.plays(since: since).count.formatted(), "plays")
+                    stat(Set(library.plays(since: since).map(\.song.id)).count.formatted(), "songs")
                 }
             }
             Section("When you listen") {
@@ -82,6 +82,8 @@ struct StatsView: View {
 struct RecapView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(MusicPlayer.self) private var player
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.locale) private var locale
     @State private var period: StatsPeriod = .month
     @State private var shareImage: Image?
 
@@ -186,6 +188,9 @@ struct RecapView: View {
         }
         .foregroundStyle(.white).padding(40).frame(width: 1080 / 2, height: 1080 / 2, alignment: .leading)
         .background(LinearGradient(colors: [.purple, .indigo], startPoint: .top, endPoint: .bottom))
+        // ImageRenderer starts from a blank environment, so carry the app's direction and language into it.
+        .environment(\.layoutDirection, layoutDirection)
+        .environment(\.locale, locale)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         return renderer.uiImage.map { Image(uiImage: $0) } ?? Image(systemName: "music.note")

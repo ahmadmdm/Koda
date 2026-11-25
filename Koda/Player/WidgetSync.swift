@@ -6,11 +6,15 @@ import WidgetKit
 enum WidgetSync {
     private static var pending: Task<Void, Never>?
     private static var lastKey = ""
-    private static var lastArtworkId = ""
+    /// The song whose artwork is in the App Group, carried over from the previous run's snapshot.
+    private static var lastArtworkId = NowPlayingSnapshot.load()?.artworkSongId ?? ""
 
     static func update(_ player: MusicPlayer) {
         pending?.cancel()
+        // The half-second wait would outlast the app once a pause stops its audio.
+        let background = UIApplication.shared.beginBackgroundTask(withName: "Widget snapshot")
         pending = Task {
+            defer { UIApplication.shared.endBackgroundTask(background) }
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
             write(player)
@@ -19,16 +23,25 @@ enum WidgetSync {
     }
 
     private static func write(_ player: MusicPlayer) {
-        guard let song = player.current else { return }
+        guard let song = player.current else {
+            // Nothing to play: never leave a widget showing the last song as playing.
+            if var stale = NowPlayingSnapshot.load(), stale.isPlaying {
+                stale.isPlaying = false
+                stale.save()
+                lastKey = ""
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+            return
+        }
         let snapshot = NowPlayingSnapshot(
             title: song.title, artist: song.artist, album: song.album,
             isPlaying: player.isPlaying, elapsed: player.currentTime, duration: player.duration,
             capturedAt: .now, isLiked: LibraryStore.shared.isLiked(song),
             upNext: player.upNext.prefix(4).map { .init(title: $0.title, artist: $0.artist) },
-            tintHex: nil)
+            tintHex: nil, songId: song.id, artworkSongId: lastArtworkId.isEmpty ? nil : lastArtworkId)
         snapshot.save()
         // Reload only when something a widget shows has changed, not on every tick.
-        let key = "\(song.id)|\(player.isPlaying)|\(snapshot.isLiked)|\(snapshot.upNext.map(\.title))|\(Int(player.duration))"
+        let key = "\(song.id)|\(player.isPlaying)|\(snapshot.isLiked)|\(snapshot.upNext.map(\.title))|\(Int(player.duration))|\(lastArtworkId)"
         if key != lastKey {
             lastKey = key
             WidgetCenter.shared.reloadAllTimelines()
@@ -49,7 +62,7 @@ enum WidgetSync {
         }
         try? scaled.jpegData(compressionQuality: 0.85)?.write(to: url, options: .atomic)
         LiveActivitySync.artworkSaved(songId: songId)
-        lastKey = ""
-        WidgetCenter.shared.reloadAllTimelines()
+        // Write the snapshot now, so it says whose artwork the file holds (this reloads the widgets).
+        write(MusicPlayer.shared)
     }
 }

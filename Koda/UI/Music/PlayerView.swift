@@ -47,7 +47,9 @@ struct PlayerView: View {
             .onEnded { v in if v.translation.height > 140 { dismiss() }; withAnimation(.spring) { dragOffset = 0 } })
         .animation(.smooth(duration: 0.35), value: showLyrics)
         .animation(.smooth(duration: 0.35), value: styleRaw)
-        .sheet(isPresented: $showQueue) { QueueView().presentationDetents([.medium, .large]).presentationBackground(.thinMaterial) }
+        // While the queue sheet is up it presents the playlist sheet itself.
+        .addToPlaylistPresenter(isActive: !showQueue)
+        .sheet(isPresented: $showQueue) { QueueView(presentsAddToPlaylist: true).presentationDetents([.medium, .large]).presentationBackground(.thinMaterial) }
         .sheet(isPresented: $showStylePicker) { StylePicker(selection: $styleRaw).presentationDetents([.height(330)]) }
         .alert("Playback", isPresented: Binding(get: { player.errorMessage != nil }, set: { if !$0 { player.errorMessage = nil } })) {
             Button("OK") {}
@@ -119,11 +121,14 @@ struct PlayerView: View {
                     Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble").frame(width: 44, height: 44)
                 }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
+                .accessibilityLabel("Lyrics")
+                .accessibilityAddTraits(showLyrics ? .isSelected : [])
                 Spacer()
                 AirPlayButton().frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
                 Spacer()
                 Button { showQueue = true } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44) }
                     .buttonStyle(.glass).buttonBorderShape(.circle)
+                    .accessibilityLabel("Queue")
             }
         }
         .font(.title3)
@@ -246,6 +251,8 @@ struct PlayerControls: View {
                 Button { player.toggleShuffle() } label: {
                     Image(systemName: "shuffle").foregroundStyle(player.shuffle ? Color.accentColor : .primary).frame(width: 36, height: 44)
                 }
+                .accessibilityLabel("Shuffle")
+                .accessibilityValue(player.shuffle ? Text("On") : Text("Off"))
                 Spacer()
                 Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title2).frame(width: 42, height: 42) }
                     .buttonStyle(.glass).buttonBorderShape(.circle)
@@ -268,11 +275,21 @@ struct PlayerControls: View {
                 Button { player.cycleRepeat() } label: {
                     Image(systemName: player.repeatMode.icon).foregroundStyle(player.repeatMode == .off ? .primary : Color.accentColor).frame(width: 36, height: 44)
                 }
+                .accessibilityLabel("Repeat")
+                .accessibilityValue(repeatValue)
             }
         }
         .buttonStyle(.plain)
         .font(.title3)
         .environment(\.layoutDirection, .leftToRight)
+    }
+
+    private var repeatValue: Text {
+        switch player.repeatMode {
+        case .off: Text("Off")
+        case .one: Text("Repeat One")
+        case .all: Text("Repeat All")
+        }
     }
 }
 
@@ -306,7 +323,7 @@ struct PlayerMenu: View {
             Divider()
             Menu("Playback Speed", systemImage: "gauge.with.dots.needle.67percent") {
                 Picker("Speed", selection: Binding(get: { player.rate }, set: { player.rate = $0 })) {
-                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0] as [Float], id: \.self) { Text(String(format: "%.2g×", $0)).tag($0) }
+                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0] as [Float], id: \.self) { Text($0.speedLabel).tag($0) }
                 }
             }
             Menu("Sleep Timer", systemImage: player.sleepTimerEnd != nil || player.sleepAtEndOfTrack ? "moon.zzz.fill" : "moon.zzz") {
@@ -465,7 +482,7 @@ struct BentoStyle: View {
                         Button { showQueue = true } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Label("Up next", systemImage: "list.bullet").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                                Text(player.upNext.first?.title ?? "Radio").font(.subheadline.weight(.semibold)).lineLimit(2)
+                                Text(player.upNext.first?.title ?? String(localized: "Radio")).font(.subheadline.weight(.semibold)).lineLimit(2)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         }.buttonStyle(.plain)

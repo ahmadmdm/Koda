@@ -211,7 +211,8 @@ struct ShortsPagerView: View {
                         ShortPageView(item: item, details: feed.details[item.id], player: players[item.id],
                                       insets: geo.safeAreaInsets,
                                       onComments: { comments = feed.details[item.id] },
-                                      onChannel: { id in dismiss(); app.navigate(.channel(id)) })
+                                      onChannel: { id in dismiss(); app.navigate(.channel(id)) },
+                                      onLeave: leave)
                             .containerRelativeFrame([.horizontal, .vertical])
                             .id(item.id)
                     }
@@ -263,6 +264,14 @@ struct ShortsPagerView: View {
         .onChange(of: feed.items.count) { activate(currentID, preloadOnly: true) }
     }
 
+    /// Closes the pager before something else plays: pauses every Short so audio never overlaps,
+    /// then runs `then` once the cover has gone, so a new player is not presented behind it.
+    private func leave(then: @escaping @MainActor () -> Void) {
+        for p in players.values { p.setActive(false) }
+        app.afterCoverDismissal(app.shorts != nil, then)
+        app.shorts = nil
+    }
+
     /// Keeps players for the visible Short and its neighbours; only the visible one plays.
     private func activate(_ id: String?, preloadOnly: Bool = false) {
         guard let id, let index = feed.items.firstIndex(where: { $0.id == id }) else { return }
@@ -293,6 +302,7 @@ struct ShortPageView: View {
     var insets: EdgeInsets
     var onComments: () -> Void
     var onChannel: (String) -> Void
+    var onLeave: (@escaping @MainActor () -> Void) -> Void
     @Environment(LibraryStore.self) private var library
 
     private var video: Video {
@@ -390,8 +400,14 @@ struct ShortPageView: View {
             }
             .buttonStyle(.plain)
             Menu {
-                Button("Watch in Player", systemImage: "play.rectangle") { VideoPlayerModel.shared.open(video) }
-                Button("Play as Audio", systemImage: "headphones") { MusicPlayer.shared.play([video.asSong], radio: true) }
+                Button("Watch in Player", systemImage: "play.rectangle") {
+                    let video = video
+                    onLeave { VideoPlayerModel.shared.open(video) }
+                }
+                Button("Play as Audio", systemImage: "headphones") {
+                    let song = video.asSong
+                    onLeave { MusicPlayer.shared.play([song], radio: true) }
+                }
                 Button(library.isInWatchLater(item.id) ? "Remove from Watch Later" : "Watch Later", systemImage: "clock") { library.toggleWatchLater(video) }
             } label: {
                 actionLabel("ellipsis", nil)

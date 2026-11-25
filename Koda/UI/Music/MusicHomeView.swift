@@ -59,8 +59,8 @@ struct MusicHomeView: View {
 
                 if let error, shelves.isEmpty { ErrorView(message: error) { Task { await load() } } }
                 else if loading && shelves.isEmpty { LoadingView() }
-                else if continuation != nil {
-                    ProgressView().frame(maxWidth: .infinity).padding().task { await loadMore() }
+                else if let continuation {
+                    ProgressView().frame(maxWidth: .infinity).padding().task(id: continuation) { await loadMore() }
                 }
             }
             .padding(.bottom, 24)
@@ -71,6 +71,7 @@ struct MusicHomeView: View {
             ToolbarItem(placement: .principal) { ModeSwitcher() }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(value: Route.recap) { Image(systemName: "chart.bar.xaxis") }
+                    .accessibilityLabel("Recap")
             }
         }
         .refreshable { await load() }
@@ -110,8 +111,10 @@ struct MusicHomeView: View {
         guard let token = continuation else { return }
         if let more = try? await MusicAPI.home(continuation: token) {
             let existing = Set(shelves.map(\.title))
-            shelves += more.shelves.filter { !existing.contains($0.title) }
-            continuation = more.continuation
+            let fresh = more.shelves.filter { !existing.contains($0.title) }
+            shelves += fresh
+            // A page that adds nothing new would only bring the same spinner back.
+            continuation = fresh.isEmpty || more.continuation == token ? nil : more.continuation
         } else { continuation = nil }
     }
 
@@ -179,7 +182,7 @@ struct MusicHomeView: View {
                     Text("Can't decide? Let the wheel pick a song.").font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                Image(systemName: "chevron.forward").foregroundStyle(.secondary)
             }
             .padding(18)
             .glassEffect(.regular.tint(.accentColor.opacity(0.2)).interactive(), in: .rect(cornerRadius: 24))

@@ -85,9 +85,45 @@
     "%lld crashes": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld أعطال"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أعطال"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld عطلًا"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "عطل واحد"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld عطل"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "عطلان"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا أعطال"
+                }
+              }
+            }
           }
         }
       }
@@ -95,9 +131,45 @@
     "%lld files imported": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "تم استيراد %lld ملفات"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تم استيراد %lld ملفات"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تم استيراد %lld ملفًا"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تم استيراد ملف واحد"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تم استيراد %lld ملف"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تم استيراد ملفين"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لم يُستورد أي ملف"
+                }
+              }
+            }
           }
         }
       }
@@ -107,7 +179,53 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld ملفات • %@"
+            "value": "%#@files@ • %2$@"
+          },
+          "substitutions": {
+            "files": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg ملفات"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg ملفًا"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ملف واحد"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg ملف"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "ملفان"
+                    }
+                  },
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "لا ملفات"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -115,9 +233,45 @@
     "%lld hangs": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld تجمّد"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld حالات تجمّد"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld حالة تجمّد"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "حالة تجمّد واحدة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld حالة تجمّد"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "حالتا تجمّد"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا حالات تجمّد"
+                }
+              }
+            }
           }
         }
       }
@@ -125,9 +279,45 @@
     "%lld min listened": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "استمعت %lld دقيقة"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "استمعت %lld دقائق"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "استمعت %lld دقيقة"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "استمعت دقيقة واحدة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "استمعت %lld دقيقة"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "استمعت دقيقتين"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "استمعت أقل من دقيقة"
+                }
+              }
+            }
           }
         }
       }
@@ -135,9 +325,45 @@
     "%lld minutes": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld دقيقة"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld دقائق"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld دقيقة"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "دقيقة واحدة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld دقيقة"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "دقيقتان"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld دقيقة"
+                }
+              }
+            }
           }
         }
       }
@@ -145,9 +371,45 @@
     "%lld other": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld أخرى"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld تقارير أخرى"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld تقريرًا آخر"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تقرير آخر"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld تقرير آخر"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "تقريران آخران"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا تقارير أخرى"
+                }
+              }
+            }
           }
         }
       }
@@ -155,9 +417,45 @@
     "%lld plays": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld تشغيل"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مرات تشغيل"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مرة تشغيل"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مرة تشغيل واحدة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld مرة تشغيل"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مرتا تشغيل"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا مرات تشغيل"
+                }
+              }
+            }
           }
         }
       }
@@ -167,7 +465,97 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld تشغيل • %lld دقيقة"
+            "value": "%#@plays@ • %#@minutes@"
+          },
+          "substitutions": {
+            "plays": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg مرات تشغيل"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg مرة تشغيل"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مرة تشغيل واحدة"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg مرة تشغيل"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "مرتا تشغيل"
+                    }
+                  },
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "لا مرات تشغيل"
+                    }
+                  }
+                }
+              }
+            },
+            "minutes": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقائق"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقيقة"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "دقيقة واحدة"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقيقة"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "دقيقتان"
+                    }
+                  },
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقيقة"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -175,9 +563,45 @@
     "%lld songs": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld أغنية"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أغانٍ"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أغنية"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "أغنية واحدة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أغنية"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "أغنيتان"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا أغاني"
+                }
+              }
+            }
           }
         }
       }
@@ -187,7 +611,53 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld أغنية • %@ على هذا الآيفون"
+            "value": "%#@songs@ • %2$@ على هذا الآيفون"
+          },
+          "substitutions": {
+            "songs": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg أغانٍ"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg أغنية"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "أغنية واحدة"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg أغنية"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "أغنيتان"
+                    }
+                  },
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "لا أغاني"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -197,7 +667,97 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "%lld أغنية • %lld دقيقة"
+            "value": "%#@songs@ • %#@minutes@"
+          },
+          "substitutions": {
+            "songs": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg أغانٍ"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg أغنية"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "أغنية واحدة"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg أغنية"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "أغنيتان"
+                    }
+                  },
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "لا أغاني"
+                    }
+                  }
+                }
+              }
+            },
+            "minutes": {
+              "argNum": 2,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقائق"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقيقة"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "دقيقة واحدة"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقيقة"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "دقيقتان"
+                    }
+                  },
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg دقيقة"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -205,9 +765,45 @@
     "%lld videos hidden": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld فيديو مخفي"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld فيديوهات مخفية"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld فيديو مخفيًا"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "فيديو واحد مخفي"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld فيديو مخفي"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "فيديوهان مخفيان"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا فيديوهات مخفية"
+                }
+              }
+            }
           }
         }
       }
@@ -275,9 +871,45 @@
     "Add %lld Songs": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "إضافة %lld أغنية"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "إضافة %lld أغانٍ"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "إضافة %lld أغنية"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "إضافة أغنية واحدة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "إضافة %lld أغنية"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "إضافة أغنيتين"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "إضافة %lld أغنية"
+                }
+              }
+            }
           }
         }
       }
@@ -288,6 +920,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "إضافة الصوت إلى قائمة الانتظار"
+          }
+        }
+      }
+    },
+    "Add Playlist": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إضافة قائمة تشغيل"
           }
         }
       }
@@ -642,6 +1284,16 @@
         }
       }
     },
+    "Cancel Download": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إلغاء التنزيل"
+          }
+        }
+      }
+    },
     "Canvas": {
       "localizations": {
         "ar": {
@@ -732,6 +1384,16 @@
         }
       }
     },
+    "Clear History": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مسح السجل"
+          }
+        }
+      }
+    },
     "Clear all history?": {
       "localizations": {
         "ar": {
@@ -758,6 +1420,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "مسح سجل الاستماع والمشاهدة"
+          }
+        }
+      }
+    },
+    "Clear listening history?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مسح سجل الاستماع؟"
           }
         }
       }
@@ -845,9 +1517,45 @@
     "Continue with %lld": {
       "localizations": {
         "ar": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "متابعة مع %lld"
+          "variations": {
+            "plural": {
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "متابعة مع %lld فنانين"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "متابعة مع %lld فنانًا"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "متابعة مع فنان واحد"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "متابعة مع %lld فنان"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "متابعة مع فنانَين"
+                }
+              },
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "متابعة"
+                }
+              }
+            }
           }
         }
       }
@@ -888,6 +1596,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "تعذّر التحميل"
+          }
+        }
+      }
+    },
+    "Couldn't load your subscriptions. Check your connection and try again.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر تحميل اشتراكاتك. تحقق من اتصالك وحاول مرة أخرى."
           }
         }
       }
@@ -1822,6 +2540,16 @@
         }
       }
     },
+    "Lyrics Options": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "خيارات الكلمات"
+          }
+        }
+      }
+    },
     "Lyrics by LRCLIB": {
       "localizations": {
         "ar": {
@@ -1882,6 +2610,16 @@
         }
       }
     },
+    "Minimize": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تصغير"
+          }
+        }
+      }
+    },
     "Missing: %@": {
       "localizations": {
         "ar": {
@@ -1908,6 +2646,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "أبيض وأسود"
+          }
+        }
+      }
+    },
+    "More": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المزيد"
           }
         }
       }
@@ -1958,6 +2706,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "ملخصي في كودا"
+          }
+        }
+      }
+    },
+    "My Playlist": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قائمتي"
           }
         }
       }
@@ -2028,6 +2786,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "أخبار"
+          }
+        }
+      }
+    },
+    "Next": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التالي"
           }
         }
       }
@@ -2162,6 +2930,16 @@
         }
       }
     },
+    "No videos": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا توجد فيديوهات"
+          }
+        }
+      }
+    },
     "Normalise volume": {
       "localizations": {
         "ar": {
@@ -2192,6 +2970,16 @@
         }
       }
     },
+    "Not Playing": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا شيء قيد التشغيل"
+          }
+        }
+      }
+    },
     "Nothing here yet": {
       "localizations": {
         "ar": {
@@ -2208,6 +2996,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "لا شيء قيد التشغيل في كودا."
+          }
+        }
+      }
+    },
+    "Nothing matches these filters.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا شيء يطابق عوامل التصفية هذه."
           }
         }
       }
@@ -2278,6 +3076,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "الأقدم"
+          }
+        }
+      }
+    },
+    "On": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل"
           }
         }
       }
@@ -2368,6 +3176,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "لصق ملفات تعريف الجلسة…"
+          }
+        }
+      }
+    },
+    "Pause": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف مؤقت"
           }
         }
       }
@@ -2902,6 +3720,36 @@
         }
       }
     },
+    "Repeat": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تكرار"
+          }
+        }
+      }
+    },
+    "Repeat All": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تكرار الكل"
+          }
+        }
+      }
+    },
+    "Repeat One": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تكرار أغنية واحدة"
+          }
+        }
+      }
+    },
     "Reports stay on this iPhone. Share one to send it with a bug report.": {
       "localizations": {
         "ar": {
@@ -2958,6 +3806,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "إعادة المحاولة"
+          }
+        }
+      }
+    },
+    "Retry Download": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إعادة محاولة التنزيل"
           }
         }
       }
@@ -3412,6 +4270,16 @@
         }
       }
     },
+    "Song": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أغنية"
+          }
+        }
+      }
+    },
     "Songs": {
       "localizations": {
         "ar": {
@@ -3568,6 +4436,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "تأتي الإحصائيات فقط من التشغيل على هذا الجهاز."
+          }
+        }
+      }
+    },
+    "Stop Voice Search": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف البحث الصوتي"
           }
         }
       }
@@ -3768,6 +4646,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "هذا الشهر"
+          }
+        }
+      }
+    },
+    "This playlist is empty.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قائمة التشغيل هذه فارغة."
           }
         }
       }
@@ -4022,6 +4910,16 @@
         }
       }
     },
+    "Voice Search": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البحث الصوتي"
+          }
+        }
+      }
+    },
     "Waiting for messages…": {
       "localizations": {
         "ar": {
@@ -4252,6 +5150,16 @@
         }
       }
     },
+    "Your statistics and recap are built from this history. This can't be undone.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تُبنى إحصاءاتك وملخصك من هذا السجل. لا يمكن التراجع عن ذلك."
+          }
+        }
+      }
+    },
     "Your top song": {
       "localizations": {
         "ar": {
@@ -4278,6 +5186,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "دقيقة"
+          }
+        }
+      }
+    },
+    "more…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المزيد…"
           }
         }
       }

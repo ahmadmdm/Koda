@@ -12,13 +12,13 @@ struct MusicLibraryView: View {
     var body: some View {
         List {
             Section {
-                row(.liked, "Liked songs", "heart.fill", .pink, "\(library.data.likedSongs.count)")
-                row(.downloads, "Downloads", "arrow.down.circle.fill", .green, "\(library.data.downloads.count)")
+                row(.liked, "Liked songs", "heart.fill", .pink, library.data.likedSongs.count.formatted())
+                row(.downloads, "Downloads", "arrow.down.circle.fill", .green, library.data.downloads.count.formatted())
                 row(.history, "History", "clock.fill", .orange, nil)
                 row(.stats, "Statistics", "chart.bar.fill", .blue, nil)
                 row(.recap, "Recap", "sparkles.rectangle.stack.fill", .purple, nil)
-                row(.savedCollections, "Albums & playlists", "square.stack.fill", .teal, "\(library.data.savedCollections.count)")
-                row(.followedArtists, "Artists", "music.microphone", .indigo, "\(library.data.followedArtists.count)")
+                row(.savedCollections, "Albums & playlists", "square.stack.fill", .teal, library.data.savedCollections.count.formatted())
+                row(.followedArtists, "Artists", "music.microphone", .indigo, library.data.followedArtists.count.formatted())
             }
             LocalMusicSection()
             if account.isSignedIn { AccountMusicLibrarySection() }
@@ -44,6 +44,7 @@ struct MusicLibraryView: View {
                         Button("New Playlist", systemImage: "plus") { showNewPlaylist = true }
                         Button("Import CSV…", systemImage: "square.and.arrow.down") { showImporter = true }
                     } label: { Image(systemName: "plus.circle.fill").font(.title3) }
+                    .accessibilityLabel("Add Playlist")
                 }
             }
         }
@@ -52,7 +53,7 @@ struct MusicLibraryView: View {
         .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() }; ToolbarItem(placement: .topBarTrailing) { EditButton() } }
         .alert("New Playlist", isPresented: $showNewPlaylist) {
             TextField("Name", text: $newName)
-            Button("Create") { library.createPlaylist(newName.isEmpty ? "My Playlist" : newName); newName = "" }
+            Button("Create") { library.createPlaylist(newName.isEmpty ? String(localized: "My Playlist") : newName); newName = "" }
             Button("Cancel", role: .cancel) {}
         }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.commaSeparatedText, .plainText]) { result in
@@ -166,6 +167,7 @@ struct LocalPlaylistView: View {
                         ShareLink(item: PlaylistCSV.export(playlist)) { Label("Export CSV", systemImage: "square.and.arrow.up") }
                         Button("Delete Playlist", systemImage: "trash", role: .destructive) { library.deletePlaylist(playlist.id); dismiss() }
                     } label: { Image(systemName: "ellipsis.circle") }
+                    .accessibilityLabel("More")
                 }
                 ToolbarItem(placement: .topBarTrailing) { EditButton() }
             }
@@ -195,7 +197,10 @@ struct LikedSongsView: View {
         .overlay { if songs.isEmpty { ContentUnavailableView("No liked songs", systemImage: "heart", description: Text("Tap the heart on any song.")) } }
         .readableContentWidth()
         .navigationTitle("Liked songs")
-        .toolbar { Menu { Picker("Sort", selection: $sort) { ForEach(SongSort.allCases) { Text($0.title).tag($0) } } } label: { Image(systemName: "arrow.up.arrow.down") } }
+        .toolbar {
+            Menu { Picker("Sort", selection: $sort) { ForEach(SongSort.allCases) { Text($0.title).tag($0) } } } label: { Image(systemName: "arrow.up.arrow.down") }
+                .accessibilityLabel("Sort")
+        }
     }
 }
 
@@ -222,8 +227,10 @@ struct DownloadsView: View {
                             }
                             if case .failed = downloads.active[song.id] {
                                 Button { downloads.retry(song) } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.glass)
+                                    .accessibilityLabel("Retry Download")
                             }
                             Button { downloads.cancel(song.id) } label: { Image(systemName: "xmark") }.buttonStyle(.glass)
+                                .accessibilityLabel("Cancel Download")
                         }
                     }
                 }
@@ -246,6 +253,7 @@ struct DownloadsView: View {
 struct HistoryView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(MusicPlayer.self) private var player
+    @State private var confirmClear = false
 
     var body: some View {
         let grouped = Dictionary(grouping: library.data.plays.reversed().prefix(1000)) { Calendar.current.startOfDay(for: $0.date) }
@@ -264,7 +272,13 @@ struct HistoryView: View {
         .overlay { if days.isEmpty { ContentUnavailableView("No history", systemImage: "clock") } }
         .readableContentWidth()
         .navigationTitle("History")
-        .toolbar { Button("Clear", role: .destructive) { library.data.plays.removeAll() } }
+        .toolbar { Button("Clear", role: .destructive) { confirmClear = true }.disabled(days.isEmpty) }
+        .confirmationDialog("Clear listening history?", isPresented: $confirmClear, titleVisibility: .visible) {
+            Button("Clear History", role: .destructive) { library.data.plays.removeAll() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your statistics and recap are built from this history. This can't be undone.")
+        }
     }
 }
 

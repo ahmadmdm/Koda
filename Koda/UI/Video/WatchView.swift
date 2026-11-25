@@ -8,7 +8,7 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
         vc.player = player
         vc.allowsPictureInPicturePlayback = true
         vc.canStartPictureInPictureAutomaticallyFromInline = true
-        vc.speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map { AVPlaybackSpeed(rate: $0, localizedName: String(format: "%.2g×", $0)) }
+        vc.speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map { AVPlaybackSpeed(rate: $0, localizedName: $0.speedLabel) }
         vc.entersFullScreenWhenPlaybackBegins = false
         vc.exitsFullScreenWhenPlaybackEnds = true
         // Captions live in the content overlay so they show inline, in fullscreen and on rotation.
@@ -187,6 +187,7 @@ struct WatchView: View {
         return HStack(spacing: sizeClass == .regular ? 8 : 4) {
             Button { model.isPresented = false } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 40, height: 40) }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
+                .accessibilityLabel("Minimize")
             Spacer()
             TrackMenus()
             if sizeClass == .regular { PictureMenu() }
@@ -206,6 +207,7 @@ struct WatchView: View {
             .accessibilityLabel(Text("Quality"))
             Button { model.close() } label: { Image(systemName: "xmark").font(.headline).frame(width: 40, height: 40) }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
+                .accessibilityLabel("Close")
         }
         .padding(.horizontal, sizeClass == .regular ? 16 : 10).padding(.bottom, 8)
     }
@@ -283,7 +285,7 @@ struct WatchView: View {
         return VStack(alignment: .leading, spacing: 12) {
             Text(d?.title ?? video?.title ?? "").font(.title3.bold())
             Button { showDescription = true } label: {
-                Text([d?.views, d?.date].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " • ") + "  more…")
+                Text([d?.views, d?.date].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " • ") + "  " + String(localized: "more…"))
                     .font(.caption).foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -309,7 +311,7 @@ struct WatchView: View {
                     GlassEffectContainer(spacing: 8) {
                         HStack(spacing: 8) {
                             Button { library.toggleVideoLike(video) } label: {
-                                Label(d?.likes ?? "Like", systemImage: library.isVideoLiked(video.id) ? "hand.thumbsup.fill" : "hand.thumbsup")
+                                Label(d?.likes ?? String(localized: "Like"), systemImage: library.isVideoLiked(video.id) ? "hand.thumbsup.fill" : "hand.thumbsup")
                             }
                             Button { library.toggleWatchLater(video) } label: {
                                 Label("Save", systemImage: library.isInWatchLater(video.id) ? "bookmark.fill" : "bookmark")
@@ -320,7 +322,7 @@ struct WatchView: View {
                                 }
                             }
                             if d?.commentsToken != nil {
-                                Button { if isWide { sidePanel = .comments } else { showComments = true } } label: { Label(d?.commentCount.map { "Comments \($0)" } ?? "Comments", systemImage: "text.bubble") }
+                                Button { if isWide { sidePanel = .comments } else { showComments = true } } label: { Label(d?.commentCount.map { String(localized: "Comments \($0)") } ?? String(localized: "Comments"), systemImage: "text.bubble") }
                             }
                             Button {
                                 MusicPlayer.shared.play([video.asSong], radio: true)
@@ -434,7 +436,7 @@ struct CommentsView: View {
                         }
                     }
                 }
-                if next != nil && !comments.isEmpty { ProgressView().frame(maxWidth: .infinity).task { await more() } }
+                if let next, !comments.isEmpty { ProgressView().frame(maxWidth: .infinity).task(id: next) { await more() } }
                 if let error { Text(error).foregroundStyle(.secondary) }
             }
             .listStyle(.plain)
@@ -453,8 +455,10 @@ struct CommentsView: View {
         guard let token = next else { return }
         if let (c, n) = try? await VideoAPI.comments(token: token, endpoint: endpoint), !c.isEmpty {
             let ids = Set(comments.map(\.id))
-            comments += c.filter { !ids.contains($0.id) }
-            next = n == token ? nil : n
+            let fresh = c.filter { !ids.contains($0.id) }
+            comments += fresh
+            // A page that adds nothing new would only bring the same spinner back.
+            next = n == token || fresh.isEmpty ? nil : n
         } else { next = nil }
     }
 }

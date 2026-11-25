@@ -41,12 +41,21 @@ struct MusicSearchView: View {
                 }
             } else {
                 Section {
-                    Picker("Filter", selection: $filter) {
-                        ForEach(MusicSearchFilter.allCases) { Text($0.title).tag($0) }
+                    // Scrolling chips rather than a segmented picker, so longer labels (Arabic) never truncate.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        GlassEffectContainer(spacing: 8) {
+                            HStack(spacing: 8) {
+                                ForEach(MusicSearchFilter.allCases) { f in
+                                    Button { filter = f } label: { Text(f.title).font(.subheadline.weight(.medium)) }
+                                        .buttonStyle(filter == f ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
+                                        .accessibilityAddTraits(filter == f ? .isSelected : [])
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
                     }
-                    .pickerStyle(.segmented)
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                 }
                 if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear) }
                 if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } }.listRowBackground(Color.clear) }
@@ -54,8 +63,8 @@ struct MusicSearchView: View {
                     ForEach(Array(results.enumerated()), id: \.element.id) { i, card in
                         resultRow(card, index: i)
                     }
-                    if continuation != nil {
-                        ProgressView().frame(maxWidth: .infinity).task { await loadMore() }
+                    if let continuation {
+                        ProgressView().frame(maxWidth: .infinity).task(id: continuation) { await loadMore() }
                     }
                 }
             }
@@ -95,6 +104,7 @@ struct MusicSearchView: View {
                 Button { voice.toggle() } label: {
                     Image(systemName: voice.isRecording ? "mic.fill" : "mic").symbolEffect(.pulse, isActive: voice.isRecording)
                 }
+                .accessibilityLabel(voice.isRecording ? "Stop Voice Search" : "Voice Search")
             }
             ToolbarItem(placement: .topBarLeading) { ModeSwitcher() }
         }
@@ -143,8 +153,10 @@ struct MusicSearchView: View {
         guard let token = continuation else { return }
         if let (items, next) = try? await MusicAPI.search(submitted, filter: filter, continuation: token) {
             let ids = Set(results.map(\.id))
-            results += items.filter { !ids.contains($0.id) }
-            continuation = items.isEmpty ? nil : next
+            let fresh = items.filter { !ids.contains($0.id) }
+            results += fresh
+            // A page that adds nothing new would only bring the same spinner back.
+            continuation = fresh.isEmpty ? nil : next
         } else { continuation = nil }
     }
 }

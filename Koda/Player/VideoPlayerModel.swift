@@ -163,12 +163,17 @@ final class VideoPlayerModel {
                 if resume > 10, info.duration - resume > 20 {
                     await player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
                 }
+                guard !Task.isCancelled, current?.id == video.id else { return }
                 player.play()
                 isLoading = false
-            } catch is CancellationError {
+                errorMessage = nil
             } catch {
+                // A superseded load fails with a cancellation error: it belongs to the old video.
+                guard !Task.isCancelled, current?.id == video.id else { return }
                 isLoading = false
-                errorMessage = error.localizedDescription
+                if !(error is CancellationError), (error as? URLError)?.code != .cancelled {
+                    errorMessage = error.localizedDescription
+                }
             }
             let d = await detailsTask
             let s = await segmentsTask

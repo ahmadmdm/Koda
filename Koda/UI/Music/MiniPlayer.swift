@@ -11,7 +11,7 @@ struct MiniPlayer: View {
             Artwork(url: player.current?.artwork, cornerRadius: 6)
                 .frame(width: 32, height: 32)
             VStack(alignment: .leading, spacing: 0) {
-                Text(player.current?.title ?? "Not Playing").font(.subheadline.weight(.semibold)).lineLimit(1)
+                Text(player.current?.title ?? String(localized: "Not Playing")).font(.subheadline.weight(.semibold)).lineLimit(1)
                 if placement != .inline {
                     Text(player.current?.artist ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -24,10 +24,13 @@ struct MiniPlayer: View {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.title3)
                         .contentTransition(.symbolEffect(.replace))
                         .frame(width: 32, height: 32)
+                        .miniPlayerHitArea()
                 }
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
             }
             if placement != .inline {
-                Button { player.next() } label: { Image(systemName: "forward.fill").font(.title3).frame(width: 32, height: 32) }
+                Button { player.next() } label: { Image(systemName: "forward.fill").font(.title3).frame(width: 32, height: 32).miniPlayerHitArea() }
+                    .accessibilityLabel("Next")
             }
         }
         .buttonStyle(.plain)
@@ -48,12 +51,22 @@ struct VideoMiniPlayer: View {
             Button { video.isPlaying ? video.player.pause() : video.player.play() } label: {
                 Image(systemName: video.isPlaying ? "pause.fill" : "play.fill").font(.title3)
                     .contentTransition(.symbolEffect(.replace)).frame(width: 32, height: 32)
+                    .miniPlayerHitArea()
             }
-            Button { video.close() } label: { Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 32, height: 32) }
+            .accessibilityLabel(video.isPlaying ? "Pause" : "Play")
+            Button { video.close() } label: { Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 32, height: 32).miniPlayerHitArea() }
+                .accessibilityLabel("Close")
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
         .onTapGesture { video.isPresented = true }
+    }
+}
+
+private extension View {
+    /// Grows a 32pt glyph's tap target to 44pt without moving or resizing what is drawn.
+    func miniPlayerHitArea() -> some View {
+        contentShape(Rectangle().inset(by: -6))
     }
 }

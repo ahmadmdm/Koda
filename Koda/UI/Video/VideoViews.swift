@@ -73,7 +73,10 @@ struct VideoCard: View {
         }
         ShareLink(item: URL(string: "https://youtu.be/\(video.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
         Divider()
-        Button("Not Interested", systemImage: "eye.slash") { library.data.hiddenVideos.append(video.id); app.showToast("Hidden") }
+        Button("Not Interested", systemImage: "eye.slash") {
+            if !library.data.hiddenVideos.contains(video.id) { library.data.hiddenVideos.append(video.id) }
+            app.showToast("Hidden")
+        }
         if let channelId = video.channelId {
             Button("Block Channel", systemImage: "hand.raised", role: .destructive) {
                 library.hideChannel(ChannelSummary(id: channelId, name: video.channel, avatar: video.channelAvatar))
@@ -186,6 +189,7 @@ struct VideoSearchView: View {
                         Menu { Picker("Sort", selection: $sort) { ForEach(VideoSort.allCases) { Text($0.title).tag($0) } } } label: {
                             Image(systemName: "line.3.horizontal.decrease.circle").font(.title3)
                         }
+                        .accessibilityLabel("Sort")
                     }
                 }
                 .listRowBackground(Color.clear)
@@ -215,7 +219,7 @@ struct VideoSearchView: View {
                         }
                     }
                 }
-                if continuation != nil { ProgressView().frame(maxWidth: .infinity).task { await loadMore() } }
+                if let continuation { ProgressView().frame(maxWidth: .infinity).task(id: continuation) { await loadMore() } }
             }
         }
         .listStyle(.plain)
@@ -264,8 +268,10 @@ struct VideoSearchView: View {
         guard let token = continuation else { return }
         if let (more, next) = try? await VideoAPI.search(submitted, filter: filter, continuation: token) {
             let ids = Set(results.map(\.id))
-            results += more.filter { !ids.contains($0.id) }
-            continuation = more.isEmpty ? nil : next
+            let fresh = more.filter { !ids.contains($0.id) }
+            results += fresh
+            // A page that adds nothing new would only bring the same spinner back.
+            continuation = fresh.isEmpty ? nil : next
         } else { continuation = nil }
     }
 }
@@ -335,6 +341,7 @@ struct VideoPlaylistView: View {
     @State private var videos: [Video] = []
     @State private var loadedTitle: String?
     @State private var error: String?
+    @State private var loaded = false
     @Environment(VideoPlayerModel.self) private var player
 
     var body: some View {
@@ -348,13 +355,19 @@ struct VideoPlaylistView: View {
         }
         .listStyle(.plain)
         .readableContentWidth()
-        .overlay { if videos.isEmpty && error == nil { LoadingView() } }
+        .overlay {
+            if videos.isEmpty && error == nil {
+                if loaded { ContentUnavailableView("No videos", systemImage: "list.bullet.rectangle", description: Text("This playlist is empty.")) }
+                else { LoadingView() }
+            }
+        }
         .navigationTitle(loadedTitle ?? title)
-        .task { if videos.isEmpty { await load() } }
+        .task { if !loaded { await load() } }
     }
 
     private func load() async {
-        do { (loadedTitle, videos) = try await VideoAPI.playlist(playlistId) } catch { self.error = error.localizedDescription }
+        do { (loadedTitle, videos) = try await VideoAPI.playlist(playlistId); error = nil } catch { self.error = error.localizedDescription }
+        loaded = true
     }
 }
 
@@ -363,6 +376,7 @@ struct SubscriptionsView: View {
     @Environment(AccountModel.self) private var account
     @State private var feed: [Video] = []
     @State private var loading = false
+    @State private var loaded = false
     @State private var channelFilter: String?
     @State private var maxAgeDays = 0
 
@@ -390,11 +404,19 @@ struct SubscriptionsView: View {
                 let visible = feed.filter { (channelFilter == nil || $0.channelId == channelFilter) && (cutoff == nil || ($0.publishedDate ?? .now) >= cutoff!) }
                 VideoGrid(videos: visible, spacing: 20)
                 if loading && feed.isEmpty { LoadingView() }
+                if !loading && loaded && hasFollows {
+                    // Every channel's feed normally has uploads, so an empty feed means they all failed.
+                    if feed.isEmpty {
+                        ErrorView(message: String(localized: "Couldn't load your subscriptions. Check your connection and try again.")) { Task { await load() } }
+                    } else if visible.isEmpty {
+                        ContentUnavailableView("No videos", systemImage: "line.3.horizontal.decrease.circle", description: Text("Nothing matches these filters."))
+                    }
+                }
             }
             .padding(.vertical)
         }
         .overlay {
-            if library.data.subscriptions.isEmpty && !account.isSignedIn {
+            if !hasFollows {
                 ContentUnavailableView("No subscriptions", systemImage: "rectangle.stack.badge.person.crop", description: Text("Subscribe to channels from their page. Follows stay on this iPhone."))
             }
         }
@@ -407,14 +429,17 @@ struct SubscriptionsView: View {
                     }
                     NavigationLink(value: Route.subscriptionsManage) { Label("Manage", systemImage: "person.2") }
                 } label: { Image(systemName: "line.3.horizontal.decrease.circle") }
+                .accessibilityLabel("Filter")
             }
         }
         .refreshable { await load() }
         .task(id: "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")") { await load() }
     }
 
+    private var hasFollows: Bool { !library.data.subscriptions.isEmpty || account.isSignedIn }
+
     private func load() async {
-        loading = true; defer { loading = false }
+        loading = true; defer { loading = false; loaded = true }
         let ids = library.data.subscriptions.map(\.id)
         let avatars = Dictionary(library.data.subscriptions.map { ($0.id, $0.avatar) }, uniquingKeysWith: { a, _ in a })
         var all: [Video] = []
@@ -535,7 +560,7 @@ struct VideoLibraryView: View {
                     Image(systemName: icon).foregroundStyle(.white).frame(width: 30, height: 30).background(color.gradient, in: RoundedRectangle(cornerRadius: 8))
                 }
                 Spacer()
-                Text("\(count)").foregroundStyle(.secondary)
+                Text(count, format: .number).foregroundStyle(.secondary)
             }
         }
     }
@@ -545,15 +570,23 @@ struct VideoLibraryView: View {
 struct AccountHistoryView: View {
     @State private var videos: [Video] = []
     @State private var loading = true
+    @State private var error: String?
     var body: some View {
         List { ForEach(videos) { VideoCard(video: $0, compact: true, queue: videos) } }
             .listStyle(.plain)
             .readableContentWidth()
             .overlay {
                 if loading { LoadingView() }
+                else if let error, videos.isEmpty { ErrorView(message: error) { Task { await load() } } }
                 else if videos.isEmpty { ContentUnavailableView("Nothing here yet", systemImage: "clock") }
             }
             .navigationTitle("Watch history")
-            .task { videos = (try? await AccountAPI.watchHistory()) ?? []; loading = false }
+            .task { await load() }
+    }
+
+    private func load() async {
+        loading = true; defer { loading = false }
+        do { videos = try await AccountAPI.watchHistory(); error = nil }
+        catch { self.error = error.localizedDescription }
     }
 }

@@ -65,9 +65,8 @@ struct RootView: View {
             WatchView()
         }
         .fullScreenCover(item: $app.shorts) { ShortsPagerView(launch: $0) }
-        .sheet(isPresented: Binding(get: { app.addToPlaylist != nil }, set: { if !$0 { app.addToPlaylist = nil } })) {
-            AddToPlaylistSheet(songs: app.addToPlaylist ?? [])
-        }
+        // The full-screen player presents its own copy; this one only shows when nothing covers the root.
+        .addToPlaylistPresenter(isActive: !app.showPlayer && !video.isPresented && app.shorts == nil)
         .overlay(alignment: .top) {
             if let toast = app.toast {
                 Text(toast).font(.subheadline.weight(.medium))

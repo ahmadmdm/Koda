@@ -18,6 +18,13 @@ nonisolated struct NowPlayingSnapshot: Codable, Hashable, Sendable {
     var isLiked: Bool
     var upNext: [Item]
     var tintHex: String?
+    /// The song shown, and the song whose artwork is in `artworkURL`. Optional, so snapshots written
+    /// before they existed still decode.
+    var songId: String? = nil
+    var artworkSongId: String? = nil
+
+    /// Whether the artwork file belongs to this song, rather than to the one before it.
+    var hasArtwork: Bool { songId != nil && artworkSongId == songId }
 
     /// From Info.plist, so builds signed with another team's identifiers share the right container.
     static let appGroup = Bundle.main.object(forInfoDictionaryKey: "KodaAppGroup") as? String ?? "group.com.koda.ios"

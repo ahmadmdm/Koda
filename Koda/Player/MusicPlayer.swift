@@ -57,6 +57,16 @@ final class MusicPlayer {
     /// The song the listener just picked. If it cannot play, say so and stay on it: skipping on
     /// to the radio's next song made it look as if a different song had been chosen.
     @ObservationIgnored private var chosenId: String?
+    /// Songs whose refused stream URL was already resolved again once, so a failing song doesn't loop.
+    @ObservationIgnored private var retriedIds: Set<String> = []
+    /// Bumped whenever a new queue replaces the old one, so radio results for the old one are dropped.
+    @ObservationIgnored private var queueGeneration = 0
+    /// Whether the listener wants sound: cleared by a pause during loading, so the load doesn't override it.
+    @ObservationIgnored private var wantsPlayback = false
+    /// The song the AVPlayer's current item was made for.
+    @ObservationIgnored private var itemSongId: String?
+    @ObservationIgnored private var wasPlayingBeforeInterruption = false
+    @ObservationIgnored private var artworkLoadingId: String?
 
     var library: LibraryStore { .shared }
 
@@ -78,12 +88,31 @@ final class MusicPlayer {
             let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
             let options = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt).map(AVAudioSession.InterruptionOptions.init)
             MainActor.assumeIsolated {
-                if type == .began { self?.isPlaying = false }
-                else if type == .ended, options?.contains(.shouldResume) == true { self?.play() }
+                guard let self else { return }
+                if type == .began {
+                    self.wasPlayingBeforeInterruption = self.isPlaying
+                    self.isPlaying = false
+                    self.updateNowPlaying()
+                } else if type == .ended {
+                    // Resume only what the interruption stopped, not music the listener had paused.
+                    if options?.contains(.shouldResume) == true, self.wasPlayingBeforeInterruption { self.play() }
+                    self.wasPlayingBeforeInterruption = false
+                }
+            }
+        }
+        NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
+            let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt).flatMap(AVAudioSession.RouteChangeReason.init)
+            guard reason == .oldDeviceUnavailable else { return }
+            // Headphones unplugged or disconnected: AVPlayer pauses, so say so everywhere.
+            MainActor.assumeIsolated {
+                guard let self, self.isPlaying || self.wantsPlayback else { return }
+                self.stopPlayback()
             }
         }
         setupRemoteCommands()
         restoreSession()
+        // The widgets and Live Activity may still show the previous run playing: show it paused.
+        Task { WidgetSync.update(self) }
         PlaybackCommandCenter.handler = { [weak self] command in
             guard let self else { return }
             switch command {
@@ -112,6 +141,7 @@ final class MusicPlayer {
         }
         queue = list
         index = min(start, list.count - 1)
+        queueGeneration += 1
         let radio = radio && !songs[startAt].isLocal
         radioSeed = radio ? songs[startAt].id : nil
         chosenId = songs[startAt].id
@@ -158,8 +188,10 @@ final class MusicPlayer {
     }
 
     func jump(toUpNext offset: Int) {
+        let target = index + 1 + offset
+        guard offset >= 0, queue.indices.contains(target) else { return }
         commitListening()
-        index = index + 1 + offset
+        index = target
         load(autoplay: true)
         saveSession()
     }
@@ -171,8 +203,15 @@ final class MusicPlayer {
     func togglePlay() { isPlaying ? pause() : play() }
 
     func play() {
-        guard current != nil else { return }
-        if player.currentItem == nil { load(autoplay: true); return }
+        guard let song = current else { return }
+        wantsPlayback = true
+        claimAudio()
+        if player.currentItem == nil || itemSongId != song.id {
+            // The player holds nothing, or still the previous song: let the running load start this
+            // one, or load it at the saved position.
+            if isLoading { isPlaying = true; updateNowPlaying() } else { load(autoplay: true, resumeAt: currentTime) }
+            return
+        }
         player.playImmediately(atRate: rate)
         isPlaying = true
         updateNowPlaying()
@@ -180,11 +219,23 @@ final class MusicPlayer {
     }
 
     func pause() {
+        stopPlayback()
+        haptic()
+    }
+
+    private func stopPlayback() {
+        wantsPlayback = false
         player.pause()
         isPlaying = false
         updateNowPlaying()
         saveSession()
-        haptic()
+    }
+
+    /// A minimized or Picture in Picture video would play over the music, and it leaves the
+    /// session set up for movies.
+    private func claimAudio() {
+        VideoPlayerModel.shared.player.pause()
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio)
     }
 
     func next() {
@@ -253,9 +304,13 @@ final class MusicPlayer {
 
     // MARK: Loading
 
-    private func load(autoplay: Bool, resumeAt: Double = 0) {
+    private func load(autoplay: Bool, resumeAt: Double = 0, retry: Bool = false) {
         guard let song = current else { return }
         loadTask?.cancel()
+        statusObservation = nil
+        if !retry { retriedIds.removeAll() }
+        wantsPlayback = autoplay
+        if autoplay { claimAudio() }
         errorMessage = nil
         isLoading = true
         currentTime = resumeAt
@@ -274,12 +329,11 @@ final class MusicPlayer {
                 let item = AVPlayerItem(asset: asset)
                 item.audioTimePitchAlgorithm = .timeDomain
                 item.preferredForwardBufferDuration = 30
-                self.player.replaceCurrentItem(with: item)
-                self.applyNormalization(loudness)
-                if resumeAt > 1 { await self.player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600)) }
-                self.statusObservation = item.observe(\.status) { @Sendable [weak self] item, _ in
+                // Observe before the item is in the player, with its current status, so a quick
+                // readyToPlay or failure is never missed.
+                self.statusObservation = item.observe(\.status, options: [.initial, .new]) { @Sendable [weak self] item, _ in
                     Task { @MainActor in
-                        guard let self else { return }
+                        guard let self, self.current?.id == song.id else { return }
                         if item.status == .readyToPlay {
                             self.isLoading = false
                             // YouTube's length is authoritative: AVPlayer misreads fragmented m4a.
@@ -291,7 +345,13 @@ final class MusicPlayer {
                         }
                     }
                 }
-                if autoplay {
+                self.player.replaceCurrentItem(with: item)
+                self.itemSongId = song.id
+                self.applyNormalization(loudness)
+                if resumeAt > 1 { await self.player.seek(to: CMTime(seconds: resumeAt, preferredTimescale: 600)) }
+                guard !Task.isCancelled else { return }
+                // A pause while loading wins over the autoplay this load started with.
+                if self.wantsPlayback {
                     self.player.playImmediately(atRate: self.rate)
                     self.isPlaying = true
                 } else {
@@ -299,8 +359,13 @@ final class MusicPlayer {
                 }
                 self.updateNowPlaying()
                 self.prefetchNext()
-            } catch is CancellationError {
             } catch {
+                // A superseded load ends in URLError.cancelled, not CancellationError: not a failure.
+                guard !Task.isCancelled else { return }
+                if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                    if self.current?.id == song.id { self.isLoading = false }
+                    return
+                }
                 playbackLog.error("stream failed \(song.id, privacy: .public): \(String(describing: error), privacy: .public)")
                 guard self.current?.id == song.id else { return }
                 self.isLoading = false
@@ -313,7 +378,7 @@ final class MusicPlayer {
                 // Skip what cannot play further down the queue, as the Android player does.
                 if self.index + 1 < self.queue.count {
                     try? await Task.sleep(for: .seconds(1.5))
-                    if self.current?.id == song.id { self.next() }
+                    if !Task.isCancelled, self.current?.id == song.id { self.next() }
                 }
             }
         }
@@ -323,10 +388,11 @@ final class MusicPlayer {
         playbackLog.error("item failed \(song.id, privacy: .public): \(String(describing: error), privacy: .public)")
         guard current?.id == song.id else { return }
         // A refused URL is usually the visitor token: forget it and resolve again once.
-        if resolved[song.id] != nil {
+        if resolved[song.id] != nil, !retriedIds.contains(song.id) {
+            retriedIds.insert(song.id)
             resolved[song.id] = nil
             UserDefaults.standard.removeObject(forKey: "visitorDataAt")
-            load(autoplay: true, resumeAt: currentTime)
+            load(autoplay: wantsPlayback, resumeAt: currentTime, retry: true)
         } else {
             isLoading = false
             isPlaying = false
@@ -408,7 +474,11 @@ final class MusicPlayer {
 
     private func extendWithRadio(seed: String?, thenAdvance: Bool = false) async {
         guard radioEnabled, let seed, !seed.hasPrefix(LocalMusicLibrary.idPrefix) else { return }
+        let generation = queueGeneration
         guard let songs = try? await MusicAPI.radio(for: seed) else { return }
+        // The listener may have picked something else, or moved on, while the radio loaded.
+        guard generation == queueGeneration, current?.id == seed else { return }
+        if thenAdvance, index != queue.count - 1 { return }
         let existing = Set(queue.map(\.id))
         let fresh = songs.filter { !existing.contains($0.id) }
         guard !fresh.isEmpty else { return }
@@ -474,8 +544,10 @@ final class MusicPlayer {
 
     private func saveSession() {
         WidgetSync.update(self)
-        if let data = try? JSONEncoder().encode(Array(queue.prefix(300))) { UserDefaults.standard.set(data, forKey: "sessionQueue") }
-        UserDefaults.standard.set(index, forKey: "sessionIndex")
+        // Keep at most 300 songs, around the current one so it is always among them.
+        let start = queue.count > 300 ? min(max(0, index - 50), queue.count - 300) : 0
+        if let data = try? JSONEncoder().encode(Array(queue[start...].prefix(300))) { UserDefaults.standard.set(data, forKey: "sessionQueue") }
+        UserDefaults.standard.set(index - start, forKey: "sessionIndex")
         UserDefaults.standard.set(currentTime, forKey: "sessionPosition")
     }
 
@@ -497,6 +569,9 @@ final class MusicPlayer {
     func stop() {
         commitListening()
         player.replaceCurrentItem(with: nil)
+        itemSongId = nil
+        wantsPlayback = false
+        queueGeneration += 1
         queue = []; index = 0; isPlaying = false
         saveSession()
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
@@ -555,9 +630,13 @@ final class MusicPlayer {
         ]
         if let album = song.album { info[MPMediaItemPropertyAlbumTitle] = album }
         if let cached = artworkCache, cached.0 == song.id { info[MPMediaItemPropertyArtwork] = cached.1 }
-        else if let url = song.artwork {
+        else if let url = song.artwork, artworkLoadingId != song.id {
+            artworkLoadingId = song.id
             Task {
-                guard let (data, _) = try? await URLSession.shared.data(from: url), let image = UIImage(data: data) else { return }
+                let image = (try? await URLSession.shared.data(from: url)).flatMap { UIImage(data: $0.0) }
+                if self.artworkLoadingId == song.id { self.artworkLoadingId = nil }
+                // The song may have changed while the artwork loaded: never show it on the next one.
+                guard let image, self.current?.id == song.id else { return }
                 let artwork = Self.artwork(image)
                 self.artworkCache = (song.id, artwork)
                 WidgetSync.saveArtwork(image, songId: song.id)

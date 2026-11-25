@@ -297,6 +297,13 @@ struct QuickPicksGrid: View {
     }
 }
 
+extension Float {
+    /// A playback rate in the user's locale, up to two fraction digits: "1.25×", "١٫٧٥×".
+    var speedLabel: String {
+        Double(self).formatted(.number.precision(.fractionLength(0...2))) + "×"
+    }
+}
+
 struct LoadingView: View {
     var body: some View { ProgressView().controlSize(.large).frame(maxWidth: .infinity, minHeight: 240) }
 }
@@ -313,6 +320,27 @@ struct ErrorView: View {
     }
 }
 
+/// Presents `AddToPlaylistSheet` for `app.addToPlaylist`. Attached to every view that can cover the
+/// root (the full-screen player, the queue sheet), with `isActive` false wherever something covers
+/// that view, so exactly one presenter shows the sheet.
+struct AddToPlaylistPresenter: ViewModifier {
+    var isActive: Bool
+    @Environment(AppState.self) private var app
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: Binding(get: { isActive && app.addToPlaylist != nil },
+                                           set: { if !$0 { app.addToPlaylist = nil } })) {
+            AddToPlaylistSheet(songs: app.addToPlaylist ?? [])
+        }
+    }
+}
+
+extension View {
+    func addToPlaylistPresenter(isActive: Bool = true) -> some View {
+        modifier(AddToPlaylistPresenter(isActive: isActive))
+    }
+}
+
 struct AddToPlaylistSheet: View {
     var songs: [Song]
     @Environment(LibraryStore.self) private var library
@@ -326,7 +354,7 @@ struct AddToPlaylistSheet: View {
                     HStack {
                         TextField("New playlist", text: $newName)
                         Button("Create") {
-                            library.createPlaylist(newName.isEmpty ? "My Playlist" : newName, songs: songs)
+                            library.createPlaylist(newName.isEmpty ? String(localized: "My Playlist") : newName, songs: songs)
                             dismiss()
                         }
                         .buttonStyle(.glassProminent)
