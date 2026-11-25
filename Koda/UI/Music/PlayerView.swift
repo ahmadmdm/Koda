@@ -69,17 +69,19 @@ struct PlayerView: View {
 
     private var header: some View {
         HStack {
-            Button { dismiss() } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 44, height: 44) }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
+            Button { dismiss() } label: { Image(systemName: "chevron.down").font(.headline).frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon) }
+                .glassIconButton()
+                .accessibilityLabel("Close")
             Spacer()
             VStack(spacing: 0) {
                 Text("PLAYING FROM").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                 Text(player.current?.album ?? (player.radioEnabled ? String(localized: "Radio") : String(localized: "Queue"))).font(.footnote.weight(.semibold)).lineLimit(1)
             }
+            .padding(.horizontal, Spacing.xs)
             Spacer()
             PlayerMenu(showStylePicker: $showStylePicker)
         }
-        .padding(.horizontal, 20).padding(.top, 8)
+        .padding(.horizontal, Spacing.l).padding(.top, Spacing.xs)
     }
 
     /// iPad and other wide windows: the player style on the leading side, lyrics or the queue on the trailing side.
@@ -97,9 +99,9 @@ struct PlayerView: View {
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 320)
                     Spacer()
-                    AirPlayButton().frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
+                    AirPlayGlassButton()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Spacing.l)
                 Group {
                     switch sidePanel {
                     case .lyrics: LyricsPanel()
@@ -118,21 +120,21 @@ struct PlayerView: View {
         GlassEffectContainer(spacing: 20) {
             HStack(spacing: 18) {
                 Button { showLyrics.toggle() } label: {
-                    Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble").frame(width: 44, height: 44)
+                    Image(systemName: showLyrics ? "quote.bubble.fill" : "quote.bubble").frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon)
                 }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .glassIconButton()
                 .accessibilityLabel("Lyrics")
                 .accessibilityAddTraits(showLyrics ? .isSelected : [])
                 Spacer()
-                AirPlayButton().frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
+                AirPlayGlassButton()
                 Spacer()
-                Button { showQueue = true } label: { Image(systemName: "list.bullet").frame(width: 44, height: 44) }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
+                Button { showQueue = true } label: { Image(systemName: "list.bullet").frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon) }
+                    .glassIconButton()
                     .accessibilityLabel("Queue")
             }
         }
         .font(.title3)
-        .padding(.horizontal, 28).padding(.bottom, 12)
+        .padding(.horizontal, 28).padding(.bottom, Spacing.s)
     }
 }
 
@@ -200,9 +202,10 @@ struct TitleBlock: View {
                     Image(systemName: library.isLiked(song) ? "heart.fill" : "heart")
                         .font(.title2).foregroundStyle(library.isLiked(song) ? .pink : .primary)
                         .symbolEffect(.bounce, value: library.isLiked(song))
-                        .frame(width: 44, height: 44)
+                        .frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon)
                 }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .glassIconButton()
+                .accessibilityLabel(library.isLiked(song) ? "Remove from Liked" : "Like")
             }
         }
     }
@@ -249,13 +252,14 @@ struct PlayerControls: View {
         GlassEffectContainer(spacing: 24) {
             HStack(spacing: 0) {
                 Button { player.toggleShuffle() } label: {
-                    Image(systemName: "shuffle").foregroundStyle(player.shuffle ? Color.accentColor : .primary).frame(width: 36, height: 44)
+                    Image(systemName: "shuffle").foregroundStyle(player.shuffle ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary)).frame(width: 36, height: 44)
                 }
                 .accessibilityLabel("Shuffle")
                 .accessibilityValue(player.shuffle ? Text("On") : Text("Off"))
                 Spacer()
                 Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title2).frame(width: 42, height: 42) }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
+                    .glassIconButton()
+                    .accessibilityLabel("Previous")
                 Spacer()
                 Button { player.togglePlay() } label: {
                     ZStack {
@@ -268,12 +272,14 @@ struct PlayerControls: View {
                     .frame(width: compact ? 52 : 64, height: compact ? 52 : 64)
                 }
                 .buttonStyle(.glassProminent).buttonBorderShape(.circle)
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
                 Spacer()
                 Button { player.next() } label: { Image(systemName: "forward.fill").font(.title2).frame(width: 42, height: 42) }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
+                    .glassIconButton()
+                    .accessibilityLabel("Next")
                 Spacer()
                 Button { player.cycleRepeat() } label: {
-                    Image(systemName: player.repeatMode.icon).foregroundStyle(player.repeatMode == .off ? .primary : Color.accentColor).frame(width: 36, height: 44)
+                    Image(systemName: player.repeatMode.icon).foregroundStyle(player.repeatMode == .off ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint)).frame(width: 36, height: 44)
                 }
                 .accessibilityLabel("Repeat")
                 .accessibilityValue(repeatValue)
@@ -293,10 +299,23 @@ struct PlayerControls: View {
     }
 }
 
+/// The AirPlay route picker in the same round glass as the player's other buttons: the same outer
+/// size as a `.glass` circle button with a 44pt glyph frame, and a primary glyph.
+struct AirPlayGlassButton: View {
+    var body: some View {
+        AirPlayButton()
+            .frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon)
+            .padding(6)
+            .glassEffect(.regular.interactive(), in: .circle)
+            .accessibilityLabel("AirPlay")
+    }
+}
+
 struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let v = AVRoutePickerView()
         v.prioritizesVideoDevices = false
+        v.tintColor = .label
         return v
     }
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
@@ -333,9 +352,10 @@ struct PlayerMenu: View {
             }
             Button("Player Style…", systemImage: "paintbrush") { showStylePicker = true }
         } label: {
-            Image(systemName: "ellipsis").font(.headline).frame(width: 44, height: 44)
+            Image(systemName: "ellipsis").font(.headline).frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon)
         }
-        .buttonStyle(.glass).buttonBorderShape(.circle)
+        .glassIconButton()
+        .accessibilityLabel("More")
     }
 }
 
@@ -343,24 +363,28 @@ struct StylePicker: View {
     @Binding var selection: String
     @Environment(\.dismiss) private var dismiss
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.m) {
             Text("Player Style").font(.title2.bold())
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.s), count: 3), spacing: Spacing.s) {
                 ForEach(PlayerStyle.allCases) { s in
+                    let selected = selection == s.rawValue
                     Button { selection = s.rawValue; dismiss() } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: s.icon).font(.title)
-                            Text(s.title).font(.subheadline.weight(.medium))
+                        VStack(spacing: Spacing.xs) {
+                            Image(systemName: s.icon).font(.title).frame(height: 32)
+                            Text(s.title).font(.subheadline.weight(.medium)).lineLimit(1).minimumScaleFactor(0.8)
                         }
                         .frame(maxWidth: .infinity, minHeight: 90)
+                        .foregroundStyle(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                        .contentShape(.rect(cornerRadius: Radius.large))
                     }
-                    .buttonStyle(.glass)
-                    .tint(selection == s.rawValue ? .accentColor : nil)
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(selection == s.rawValue ? Color.accentColor : .clear, lineWidth: 2))
+                    .buttonStyle(.plain)
+                    .background(selected ? AnyShapeStyle(.tint.opacity(0.18)) : AnyShapeStyle(.primary.opacity(0.06)), in: .rect(cornerRadius: Radius.large))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.large).strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear), lineWidth: 2))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
         }
-        .padding(24)
+        .padding(Spacing.xl)
     }
 }
 
@@ -548,7 +572,7 @@ private struct DialProgress: View {
     @Environment(MusicPlayer.self) private var player
     var body: some View {
         Circle().trim(from: 0, to: player.duration > 0 ? player.currentTime / player.duration : 0)
-            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+            .stroke(.tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
             .rotationEffect(.degrees(-90))
             .animation(.linear(duration: 0.25), value: player.currentTime)
     }

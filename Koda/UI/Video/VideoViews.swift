@@ -130,7 +130,7 @@ struct VideoHomeView: View {
                         HStack(spacing: 8) {
                             ForEach(VideoTopic.all) { t in
                                 Button { topic = t } label: { Label(t.title, systemImage: t.icon).font(.subheadline.weight(.medium)) }
-                                    .buttonStyle(topic == t ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
+                                    .filterChip(selected: topic == t)
                             }
                         }
                         .padding(.horizontal)
@@ -215,20 +215,33 @@ struct VideoSearchView: View {
                 if items.isEmpty {
                     ContentUnavailableView("Search YouTube", systemImage: "play.rectangle.on.rectangle", description: Text("Videos, channels and playlists."))
                         .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             } else {
-                HStack {
-                    Picker("Filter", selection: $filter) { ForEach(VideoSearchFilter.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
-                    if filter == .videos {
-                        Menu { Picker("Sort", selection: $sort) { ForEach(VideoSort.allCases) { Text($0.title).tag($0) } } } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle").font(.title3)
+                // The same scrolling glass chips as music search, so the two searches look alike.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer(spacing: Spacing.xs) {
+                        HStack(spacing: Spacing.xs) {
+                            ForEach(VideoSearchFilter.allCases) { f in
+                                Button { filter = f } label: { Text(f.title).font(.subheadline.weight(.medium)) }
+                                    .filterChip(selected: filter == f)
+                            }
+                            if filter == .videos {
+                                Menu { Picker("Sort", selection: $sort) { ForEach(VideoSort.allCases) { Text($0.title).tag($0) } } } label: {
+                                    Image(systemName: "line.3.horizontal.decrease")
+                                }
+                                .filterChip(selected: false)
+                                .accessibilityLabel("Sort")
+                            }
                         }
-                        .accessibilityLabel("Sort")
+                        .padding(.horizontal, Spacing.m)
                     }
                 }
                 .listRowBackground(Color.clear)
-                if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear) }
-                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } } }
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: Spacing.xxs, leading: 0, bottom: Spacing.xxs, trailing: 0))
+                if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear).listRowSeparator(.hidden) }
+                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } }.listRowSeparator(.hidden) }
                 let videos = results.compactMap { if case .video(let v) = $0 { v } else { nil } }
                 ForEach(results) { r in
                     switch r {
@@ -280,7 +293,7 @@ struct VideoSearchView: View {
         }
         .onChange(of: filter) { Task { await search() } }
         .onChange(of: sort) { Task { await search() } }
-        .toolbar { ToolbarItem(placement: .topBarLeading) { ModeSwitcher() } }
+        .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
     }
 
     private func submit(_ raw: String) {
@@ -426,7 +439,7 @@ struct SubscriptionsView: View {
                                 Button { channelFilter = channelFilter == c.id ? nil : c.id } label: {
                                     VStack {
                                         Artwork(url: c.avatar.flatMap(URL.init(string:)), cornerRadius: 30, placeholderIcon: "person.fill").frame(width: 60, height: 60)
-                                            .overlay(Circle().stroke(Color.accentColor, lineWidth: channelFilter == c.id ? 3 : 0))
+                                            .overlay(Circle().stroke(.tint, lineWidth: channelFilter == c.id ? 3 : 0))
                                         Text(c.name).font(.caption2).lineLimit(1).frame(width: 66)
                                     }
                                 }
@@ -603,7 +616,8 @@ struct VideoLibraryView: View {
                     Image(systemName: icon).foregroundStyle(.white).frame(width: 30, height: 30).background(color.gradient, in: RoundedRectangle(cornerRadius: 8))
                 }
                 Spacer()
-                Text(count, format: .number).foregroundStyle(.secondary)
+                // No "0": in Arabic its digit (٠) reads as a stray dot.
+                if count > 0 { Text(count, format: .number).foregroundStyle(.secondary).monospacedDigit() }
             }
         }
     }

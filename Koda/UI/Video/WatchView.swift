@@ -103,7 +103,7 @@ struct TrackMenus: View {
             } label: {
                 Image(systemName: model.selectedAudio?.isOriginal == false ? "waveform.badge.mic" : "waveform").frame(width: 40, height: 40)
             }
-            .buttonStyle(.glass).buttonBorderShape(.circle)
+            .glassIconButton()
             .accessibilityLabel("Audio track")
         }
         if !model.captionTracks.isEmpty {
@@ -123,7 +123,7 @@ struct TrackMenus: View {
             } label: {
                 Image(systemName: model.selectedCaption == nil ? "captions.bubble" : "captions.bubble.fill").frame(width: 40, height: 40)
             }
-            .buttonStyle(.glass).buttonBorderShape(.circle)
+            .glassIconButton()
             .accessibilityLabel("Subtitles")
         }
     }
@@ -206,7 +206,7 @@ struct WatchView: View {
         // Six round buttons: explicit tight spacing so the bar fits an iPhone's width.
         return HStack(spacing: sizeClass == .regular ? 8 : 4) {
             Button { model.isPresented = false } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 40, height: 40) }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .glassIconButton()
                 .accessibilityLabel("Minimize")
             Spacer()
             TrackMenus()
@@ -224,9 +224,10 @@ struct WatchView: View {
             }
             .buttonStyle(.glass)
             .buttonBorderShape(sizeClass == .regular ? .capsule : .circle)
+            .tint(.primary)
             .accessibilityLabel(Text("Quality"))
             Button { model.close() } label: { Image(systemName: "xmark").font(.headline).frame(width: 40, height: 40) }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .glassIconButton()
                 .accessibilityLabel("Close")
         }
         .padding(.horizontal, sizeClass == .regular ? 16 : 10).padding(.bottom, 8)
@@ -263,7 +264,7 @@ struct WatchView: View {
             HStack {
                 Text("Up next").font(.headline)
                 Spacer()
-                Button { model.playNext() } label: { Label("Play", systemImage: "forward.fill") }.buttonStyle(.glass).controlSize(.small)
+                Button { model.playNext() } label: { Label("Play", systemImage: "forward.fill") }.buttonStyle(.glass).tint(.primary).controlSize(.small)
             }
             VideoCard(video: next, compact: true)
         }
@@ -357,9 +358,13 @@ struct WatchView: View {
                             ShareLink(item: URL(string: "https://youtu.be/\(video.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
                         }
                         .buttonStyle(.glass)
+                        .tint(.primary)
                         .font(.subheadline)
                     }
                 }
+                // Scroll to the screen edges instead of clipping at the page's 16pt margin.
+                .contentMargins(.horizontal, Spacing.m, for: .scrollContent)
+                .padding(.horizontal, -Spacing.m)
             }
         }
     }

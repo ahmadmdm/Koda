@@ -93,8 +93,10 @@ struct CollectionActions: View {
                     }
                 } label: { Image(systemName: "ellipsis").frame(width: 30, height: 22) }
                 .buttonStyle(.glass)
+                .accessibilityLabel("More")
             }
         }
+        .labelStyle(.titleAndIcon)
         .controlSize(.large)
         .disabled(songs.isEmpty)
     }
@@ -153,18 +155,19 @@ struct ArtistView: View {
                         .frame(height: 340).clipped()
                         .backgroundExtensionEffect()
                     LinearGradient(colors: [.clear, Color(.systemBackground)], startPoint: .center, endPoint: .bottom)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(page.name).font(.system(size: 40, weight: .heavy))
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        // Scales with Dynamic Type; long names shrink rather than clip.
+                        Text(page.name).font(.largeTitle.weight(.heavy)).lineLimit(2).minimumScaleFactor(0.6)
                         if let subs = page.subscribers { Text("\(subs) subscribers").foregroundStyle(.secondary) }
-                        HStack {
+                        GlassEffectContainer(spacing: Spacing.xs) { HStack(spacing: Spacing.xs) {
                             Button { player.play(page.topSongs) } label: { Label("Play", systemImage: "play.fill") }.buttonStyle(.glassProminent)
                             Button { if let s = page.topSongs.first { player.startRadio(from: s) } } label: {
                                 Label("Radio", systemImage: "dot.radiowaves.left.and.right")
-                            }.buttonStyle(.glass)
+                            }.buttonStyle(.glass).tint(.primary)
                             Button { library.toggleSaved(card) } label: {
                                 Label(library.isSaved(card) ? "Following" : "Follow", systemImage: library.isSaved(card) ? "checkmark" : "plus")
-                            }.buttonStyle(.glass)
-                        }
+                            }.buttonStyle(.glass).tint(.primary)
+                        } }
                     }
                     .padding()
                 }

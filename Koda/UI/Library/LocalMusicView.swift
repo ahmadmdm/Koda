@@ -15,7 +15,7 @@ struct LocalMusicSection: View {
                             .background(Color.gray.gradient, in: RoundedRectangle(cornerRadius: 8))
                     }
                     Spacer()
-                    Text(local.songs.count, format: .number).foregroundStyle(.secondary)
+                    if !local.songs.isEmpty { Text(local.songs.count, format: .number).foregroundStyle(.secondary).monospacedDigit() }
                 }
             }
             Button("Import audio files…", systemImage: "square.and.arrow.down") { showImporter = true }

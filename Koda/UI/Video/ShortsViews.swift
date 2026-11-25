@@ -229,7 +229,7 @@ struct ShortsPagerView: View {
             .overlay(alignment: .top) {
                 HStack {
                     Button { dismiss() } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 40, height: 40) }
-                        .buttonStyle(.glass).buttonBorderShape(.circle)
+                        .glassIconButton()
                         .accessibilityLabel("Close")
                     Spacer()
                     Text("Shorts").font(.headline).foregroundStyle(.white).shadow(radius: 4)
@@ -237,7 +237,7 @@ struct ShortsPagerView: View {
                     Button { muted.toggle() } label: {
                         Image(systemName: muted ? "speaker.slash.fill" : "speaker.wave.2.fill").font(.headline).frame(width: 40, height: 40)
                     }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
+                    .glassIconButton()
                     .accessibilityLabel(muted ? "Unmute" : "Mute")
                 }
                 .padding(.horizontal)

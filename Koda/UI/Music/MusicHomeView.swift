@@ -56,7 +56,8 @@ struct MusicHomeView: View {
                     }))
                 }
 
-                ForEach(shelves) { ShelfView(shelf: $0) }
+                // YouTube Music's own "Quick picks" shelf repeats the one above under the same title.
+                ForEach(shelves.filter { quickPicks.isEmpty || $0.title != String(localized: "Quick picks") }) { ShelfView(shelf: $0) }
 
                 if let error, shelves.isEmpty { ErrorView(message: error) { Task { await load() } } }
                 else if loading && shelves.isEmpty { LoadingView() }
@@ -184,16 +185,20 @@ struct MusicHomeView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: "dial.high.fill").font(.largeTitle)
+                    .foregroundStyle(.tint)
                     .rotationEffect(.degrees(spinning ? 720 : 0))
                 VStack(alignment: .leading) {
                     Text("Spin").font(.headline)
                     Text("Can't decide? Let the wheel pick a song.").font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.forward").foregroundStyle(.secondary)
+                Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
             }
-            .padding(18)
-            .glassEffect(.regular.tint(.accentColor.opacity(0.2)).interactive(), in: .rect(cornerRadius: 24))
+            .padding(Spacing.m)
+            // A card in the content layer: a tinted fill, not glass (glass is for the controls above content).
+            .background(.tint.opacity(0.14), in: .rect(cornerRadius: Radius.large))
+            .overlay(RoundedRectangle(cornerRadius: Radius.large).strokeBorder(.tint.opacity(0.25), lineWidth: 1))
+            .contentShape(.rect(cornerRadius: Radius.large))
         }
         .buttonStyle(.plain)
         .padding(.horizontal)

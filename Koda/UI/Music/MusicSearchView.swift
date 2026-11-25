@@ -38,6 +38,7 @@ struct MusicSearchView: View {
                     ContentUnavailableView("Search YouTube Music", systemImage: "music.magnifyingglass",
                                            description: Text("Songs, albums, artists, playlists and videos."))
                         .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                 }
             } else {
                 Section {
@@ -47,18 +48,18 @@ struct MusicSearchView: View {
                             HStack(spacing: 8) {
                                 ForEach(MusicSearchFilter.allCases) { f in
                                     Button { filter = f } label: { Text(f.title).font(.subheadline.weight(.medium)) }
-                                        .buttonStyle(filter == f ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
-                                        .accessibilityAddTraits(filter == f ? .isSelected : [])
+                                        .filterChip(selected: filter == f)
                                 }
                             }
                             .padding(.horizontal, 16)
                         }
                     }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: Spacing.xxs, leading: 0, bottom: Spacing.xxs, trailing: 0))
                 }
-                if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear) }
-                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } }.listRowBackground(Color.clear) }
+                if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear).listRowSeparator(.hidden) }
+                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } }.listRowBackground(Color.clear).listRowSeparator(.hidden) }
                 Section {
                     ForEach(Array(results.enumerated()), id: \.element.id) { i, card in
                         resultRow(card, index: i)
@@ -106,7 +107,7 @@ struct MusicSearchView: View {
                 }
                 .accessibilityLabel(voice.isRecording ? "Stop Voice Search" : "Voice Search")
             }
-            ToolbarItem(placement: .topBarLeading) { ModeSwitcher() }
+            ToolbarItem(placement: .principal) { ModeSwitcher() }
         }
     }
 
@@ -118,7 +119,7 @@ struct MusicSearchView: View {
         } else if let route = card.route {
             NavigationLink(value: route) {
                 HStack(spacing: 12) {
-                    Artwork(url: card.artwork, cornerRadius: card.kind == .artist ? 25 : 6,
+                    Artwork(url: card.artwork, cornerRadius: card.kind == .artist ? 25 : Radius.small,
                             placeholderIcon: card.kind == .artist ? "person.fill" : "square.stack")
                         .frame(width: 50, height: 50)
                     VStack(alignment: .leading) {

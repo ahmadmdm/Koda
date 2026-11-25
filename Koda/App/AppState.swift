@@ -113,7 +113,9 @@ final class AppState {
                 let wasShowing = closeVideoCovers()
                 Task {
                     let info = try? await InnerTube.shared.player(videoId: v)
-                    let song = Song(id: v, title: info?.title ?? String(localized: "Song"), artist: info?.author ?? "",
+                    // YouTube's auto-generated artist channels are named "Artist - Topic"; show just the artist.
+                    let author = (info?.author ?? "").replacingOccurrences(of: " - Topic", with: "", options: [.anchored, .backwards])
+                    let song = Song(id: v, title: info?.title ?? String(localized: "Song"), artist: author,
                                     duration: info.map { Int($0.duration) }, thumbnail: info?.thumbnail)
                     MusicPlayer.shared.play([song], radio: true)
                     afterCoverDismissal(wasShowing) { self.showPlayer = true }
@@ -138,17 +140,27 @@ enum Palette: String, CaseIterable, Identifiable {
     case violet, emerald, sunset, ocean, crimson, blossom, solar, midnight, artwork
     var id: String { rawValue }
     var title: String { self == .artwork ? String(localized: "From Artwork") : String(localized: String.LocalizationValue(rawValue.capitalized)) }
+    /// The accent in light and dark: the dark-mode copy is lighter, so tinted text, glyphs and the selected
+    /// tab keep at least 4.5:1 against a black background; the light copy of the paler palettes is deeper,
+    /// for the same contrast against white.
     var color: Color {
         switch self {
-        case .violet, .artwork: Color(red: 0.40, green: 0.31, blue: 0.64)
+        case .violet, .artwork: Self.dynamic(light: (0.40, 0.31, 0.64), dark: (0.58, 0.48, 0.90))
         case .emerald: Color(red: 0.11, green: 0.55, blue: 0.36)
-        case .sunset: Color(red: 0.93, green: 0.45, blue: 0.24)
-        case .ocean: Color(red: 0.12, green: 0.47, blue: 0.80)
-        case .crimson: Color(red: 0.78, green: 0.16, blue: 0.23)
-        case .blossom: Color(red: 0.89, green: 0.38, blue: 0.62)
-        case .solar: Color(red: 0.86, green: 0.65, blue: 0.10)
-        case .midnight: Color(red: 0.25, green: 0.27, blue: 0.55)
+        case .sunset: Self.dynamic(light: (0.82, 0.36, 0.15), dark: (0.93, 0.45, 0.24))
+        case .ocean: Self.dynamic(light: (0.12, 0.47, 0.80), dark: (0.24, 0.56, 0.92))
+        case .crimson: Self.dynamic(light: (0.78, 0.16, 0.23), dark: (0.90, 0.26, 0.32))
+        case .blossom: Self.dynamic(light: (0.80, 0.27, 0.52), dark: (0.89, 0.38, 0.62))
+        case .solar: Self.dynamic(light: (0.66, 0.47, 0.0), dark: (0.86, 0.65, 0.10))
+        case .midnight: Self.dynamic(light: (0.25, 0.27, 0.55), dark: (0.48, 0.52, 0.92))
         }
+    }
+
+    private static func dynamic(light: (CGFloat, CGFloat, CGFloat), dark: (CGFloat, CGFloat, CGFloat)) -> Color {
+        Color(UIColor { traits in
+            let c = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(red: c.0, green: c.1, blue: c.2, alpha: 1)
+        })
     }
 }
 

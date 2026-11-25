@@ -17,7 +17,7 @@ struct MusicLibraryView: View {
                 row(.history, "History", "clock.fill", .orange, nil)
                 row(.stats, "Statistics", "chart.bar.fill", .blue, nil)
                 row(.recap, "Recap", "sparkles.rectangle.stack.fill", .purple, nil)
-                row(.savedCollections, "Albums & playlists", "square.stack.fill", .teal, library.data.savedCollections.count.formatted())
+                row(.savedCollections, "Albums & playlists", "square.stack.3d.up.fill", .teal, library.data.savedCollections.count.formatted())
                 row(.followedArtists, "Artists", "music.microphone", .indigo, library.data.followedArtists.count.formatted())
             }
             LocalMusicSection()
@@ -69,7 +69,8 @@ struct MusicLibraryView: View {
                         .background(color.gradient, in: RoundedRectangle(cornerRadius: 8))
                 }
                 Spacer()
-                if let detail { Text(detail).foregroundStyle(.secondary) }
+                // No "0": in Arabic its digit (٠) reads as a stray dot.
+                if let detail, detail != 0.formatted() { Text(detail).foregroundStyle(.secondary).monospacedDigit() }
             }
         }
     }

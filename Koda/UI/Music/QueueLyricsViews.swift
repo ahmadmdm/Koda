@@ -28,6 +28,7 @@ struct QueueView: View {
                         Spacer()
                         Toggle(isOn: $player.radioEnabled) { Label("Autoplay radio", systemImage: "infinity") }
                             .toggleStyle(.button).buttonStyle(.glass).controlSize(.small)
+                            .textCase(nil)
                     }
                 }
             }
@@ -70,11 +71,15 @@ struct LyricsPanel: View {
                 synced(lyrics.synced, source: lyrics.source)
             } else if let plain = lyrics?.plain {
                 ScrollView {
-                    Text(plain).font(.system(size: size * 0.75, weight: .semibold)).padding(24)
+                    Text(plain).font(.system(size: size * 0.75, weight: .semibold))
+                        // Arabic needs room above and below the line for its dots and marks.
+                        .lineSpacing(size * 0.3)
+                        .padding(.horizontal, 26).padding(.vertical, Spacing.xl)
                         .multilineTextAlignment(alignment(for: plain))
                         .frame(maxWidth: .infinity, alignment: alignment(for: plain) == .leading ? .leading : .trailing)
-                    Text("Lyrics from \(lyrics?.source ?? "")").font(.caption).foregroundStyle(.secondary).padding(.bottom)
+                    Text("Lyrics from \(lyrics?.source ?? "")").font(.caption).foregroundStyle(.secondary).padding(.bottom, Spacing.xxl)
                 }
+                .lyricsEdgeFade()
             } else {
                 ContentUnavailableView("No lyrics", systemImage: "quote.bubble", description: Text("No provider has lyrics for this song yet."))
             }
@@ -101,6 +106,7 @@ struct LyricsPanel: View {
                     ForEach(lines) { line in
                         Text(line.text.isEmpty ? "♪" : line.text)
                             .font(.system(size: size, weight: .bold))
+                            .lineSpacing(size * 0.2)
                             .multilineTextAlignment(alignment(for: line.text))
                             .frame(maxWidth: .infinity, alignment: alignment(for: line.text) == .leading ? .leading : .trailing)
                             .foregroundStyle(line.id == active ? .primary : .secondary)
@@ -116,6 +122,7 @@ struct LyricsPanel: View {
                 }
                 .padding(.horizontal, 26)
             }
+            .lyricsEdgeFade()
             .onChange(of: active) { _, new in
                 withAnimation(.smooth(duration: 0.5)) { proxy.scrollTo(new, anchor: UnitPoint(x: 0, y: 0.3)) }
             }
@@ -134,10 +141,22 @@ struct LyricsPanel: View {
                 } label: {
                     Image(systemName: "slider.horizontal.3").frame(width: 40, height: 40)
                 }
-                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .glassIconButton()
                 .accessibilityLabel("Lyrics Options")
                 .padding(.trailing, 16)
             }
+        }
+    }
+}
+
+private extension View {
+    /// Fades lyrics out at the top and bottom edges instead of cutting a line in half against the
+    /// player's header and controls.
+    func lyricsEdgeFade() -> some View {
+        mask {
+            LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.06),
+                                   .init(color: .black, location: 0.9), .init(color: .clear, location: 1)],
+                           startPoint: .top, endPoint: .bottom)
         }
     }
 }

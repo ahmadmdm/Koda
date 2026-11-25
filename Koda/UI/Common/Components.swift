@@ -162,7 +162,7 @@ struct SongRow: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).font(.body).lineLimit(1)
-                        .foregroundStyle(player.currentId == song.id ? Color.accentColor : .primary)
+                        .foregroundStyle(player.currentId == song.id ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     HStack(spacing: 4) {
                         if downloads.isDownloaded(song.id) {
                             Image(systemName: "arrow.down.circle.fill").font(.caption2).foregroundStyle(.tint)

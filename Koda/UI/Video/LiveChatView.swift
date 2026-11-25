@@ -111,7 +111,7 @@ struct LiveChatPanel: View {
                     .font(.headline)
                 Spacer()
                 Button(action: onClose) { Image(systemName: "xmark").font(.subheadline.weight(.semibold)).frame(width: 32, height: 32) }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
+                    .glassIconButton()
                     .accessibilityLabel("Close chat")
             }
             .padding(.horizontal).padding(.vertical, 8)

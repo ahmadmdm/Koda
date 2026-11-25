@@ -110,7 +110,7 @@ struct PictureMenu: View {
         if submenu {
             menu.labelStyle(.titleAndIcon)
         } else {
-            menu.buttonStyle(.glass).buttonBorderShape(.circle)
+            menu.glassIconButton()
         }
     }
 
