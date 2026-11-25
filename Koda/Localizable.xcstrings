@@ -5269,6 +5269,754 @@
           }
         }
       }
+    },
+    "%@ Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج %@"
+          }
+        }
+      }
+    },
+    "%@ · %@ left": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · متبقٍ %@"
+          }
+        }
+      }
+    },
+    "%lld • %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld • %@"
+          }
+        }
+      }
+    },
+    "Added to queue": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أُضيف إلى قائمة الانتظار"
+          }
+        }
+      }
+    },
+    "Afternoon Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج العصر"
+          }
+        }
+      }
+    },
+    "Artist mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج الفنان"
+          }
+        }
+      }
+    },
+    "Audio only": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الصوت فقط"
+          }
+        }
+      }
+    },
+    "Can't reach YouTube Music": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر الوصول إلى يوتيوب ميوزك"
+          }
+        }
+      }
+    },
+    "Cancel this download?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إلغاء هذا التنزيل؟"
+          }
+        }
+      }
+    },
+    "Check your connection, or play your downloads.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تحقق من اتصالك، أو شغّل تنزيلاتك."
+          }
+        }
+      }
+    },
+    "Continue listening": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "متابعة الاستماع"
+          }
+        }
+      }
+    },
+    "Couldn't make this mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر إنشاء هذا المزيج"
+          }
+        }
+      }
+    },
+    "Couldn't play %@: %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر تشغيل %@: %@"
+          }
+        }
+      }
+    },
+    "Download failed": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فشل التنزيل"
+          }
+        }
+      }
+    },
+    "Downloaded": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم التنزيل"
+          }
+        }
+      }
+    },
+    "Downloaded %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم التنزيل %@"
+          }
+        }
+      }
+    },
+    "Downloaded (audio)": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم التنزيل (صوت)"
+          }
+        }
+      }
+    },
+    "Downloaded videos": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الفيديوهات المنزّلة"
+          }
+        }
+      }
+    },
+    "Downloaded videos play without a connection. Download one from its page or its menu.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعمل الفيديوهات المنزّلة دون اتصال. نزّل فيديو من صفحته أو من قائمته."
+          }
+        }
+      }
+    },
+    "Downloads play without a connection. Sizes are estimates.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعمل التنزيلات دون اتصال. الأحجام تقديرية."
+          }
+        }
+      }
+    },
+    "Download…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تنزيل…"
+          }
+        }
+      }
+    },
+    "Drive Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج القيادة"
+          }
+        }
+      }
+    },
+    "Edit": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعديل"
+          }
+        }
+      }
+    },
+    "End of song": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "نهاية الأغنية"
+          }
+        }
+      }
+    },
+    "Evening Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج المساء"
+          }
+        }
+      }
+    },
+    "Favourites and radio": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المفضلة والراديو"
+          }
+        }
+      }
+    },
+    "For the Drive": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "للطريق"
+          }
+        }
+      }
+    },
+    "Fresh Finds": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اكتشافات جديدة"
+          }
+        }
+      }
+    },
+    "Keep Downloading": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "متابعة التنزيل"
+          }
+        }
+      }
+    },
+    "Late Night Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج آخر الليل"
+          }
+        }
+      }
+    },
+    "Live streams can't be downloaded.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يمكن تنزيل البث المباشر."
+          }
+        }
+      }
+    },
+    "Made for right now": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مصنوع لهذا الوقت"
+          }
+        }
+      }
+    },
+    "Morning Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج الصباح"
+          }
+        }
+      }
+    },
+    "Move Down": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "نقل للأسفل"
+          }
+        }
+      }
+    },
+    "Move Up": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "نقل للأعلى"
+          }
+        }
+      }
+    },
+    "New to you": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جديد عليك"
+          }
+        }
+      }
+    },
+    "No signal needed": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا حاجة لإشارة"
+          }
+        }
+      }
+    },
+    "Offline Mix": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيج دون اتصال"
+          }
+        }
+      }
+    },
+    "Pause the music after": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف الموسيقى بعد"
+          }
+        }
+      }
+    },
+    "Play Now": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل الآن"
+          }
+        }
+      }
+    },
+    "Play your downloads": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "شغّل تنزيلاتك"
+          }
+        }
+      }
+    },
+    "Playing next": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التالي في التشغيل"
+          }
+        }
+      }
+    },
+    "Preparing…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جارٍ التجهيز…"
+          }
+        }
+      }
+    },
+    "Queue is empty": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قائمة الانتظار فارغة"
+          }
+        }
+      }
+    },
+    "Recently played": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المشغّل مؤخرًا"
+          }
+        }
+      }
+    },
+    "Remove this download?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إزالة هذا التنزيل؟"
+          }
+        }
+      }
+    },
+    "Repeat: All": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التكرار: الكل"
+          }
+        }
+      }
+    },
+    "Repeat: Off": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التكرار: إيقاف"
+          }
+        }
+      }
+    },
+    "Repeat: One": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التكرار: واحد"
+          }
+        }
+      }
+    },
+    "Shuffle history": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل السجل عشوائيًا"
+          }
+        }
+      }
+    },
+    "Sleep timer": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مؤقت النوم"
+          }
+        }
+      }
+    },
+    "Sleep timer: end of song": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مؤقت النوم: نهاية الأغنية"
+          }
+        }
+      }
+    },
+    "Songs you play show up here.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تظهر هنا الأغاني التي تشغّلها."
+          }
+        }
+      }
+    },
+    "Tap to try again": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اضغط للمحاولة مرة أخرى"
+          }
+        }
+      }
+    },
+    "The download was interrupted.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "توقف التنزيل."
+          }
+        }
+      }
+    },
+    "The video will need a connection to play again.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سيحتاج الفيديو إلى اتصال ليعمل مرة أخرى."
+          }
+        }
+      }
+    },
+    "Turn off timer": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف المؤقت"
+          }
+        }
+      }
+    },
+    "Use Play Next or Add to Queue on any video.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استخدم «تشغيل التالي» أو «إضافة إلى قائمة الانتظار» على أي فيديو."
+          }
+        }
+      }
+    },
+    "Your artists": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "فنانوك"
+          }
+        }
+      }
+    },
+    "≈ %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "≈ %@"
+          }
+        }
+      }
+    },
+    "%lld songs, no signal needed": {
+      "localizations": {
+        "ar": {
+          "variations": {
+            "plural": {
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "لا أغاني"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "أغنية واحدة، دون حاجة لإشارة"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "أغنيتان، دون حاجة لإشارة"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أغانٍ، دون حاجة لإشارة"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أغنية، دون حاجة لإشارة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld أغنية، دون حاجة لإشارة"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Sleep timer: %lld min left": {
+      "localizations": {
+        "ar": {
+          "variations": {
+            "plural": {
+              "zero": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مؤقت النوم: انتهى"
+                }
+              },
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مؤقت النوم: متبقٍ دقيقة"
+                }
+              },
+              "two": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مؤقت النوم: متبقٍ دقيقتان"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مؤقت النوم: متبقٍ %lld دقائق"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مؤقت النوم: متبقٍ %lld دقيقة"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "مؤقت النوم: متبقٍ %lld دقيقة"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld videos • %@ on this iPhone": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%#@videos@ • %2$@ على هذا الآيفون"
+          },
+          "substitutions": {
+            "videos": {
+              "argNum": 1,
+              "formatSpecifier": "lld",
+              "variations": {
+                "plural": {
+                  "zero": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "لا فيديوهات"
+                    }
+                  },
+                  "one": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "فيديو واحد"
+                    }
+                  },
+                  "two": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "فيديوهان"
+                    }
+                  },
+                  "few": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg فيديوهات"
+                    }
+                  },
+                  "many": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg فيديو"
+                    }
+                  },
+                  "other": {
+                    "stringUnit": {
+                      "state": "translated",
+                      "value": "%arg فيديو"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
