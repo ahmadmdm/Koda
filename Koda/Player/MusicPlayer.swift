@@ -115,6 +115,8 @@ final class MusicPlayer {
         Task { WidgetSync.update(self) }
         PlaybackCommandCenter.handler = { [weak self] command in
             guard let self else { return }
+            // Widget and Live Activity buttons act on whichever player owns Now Playing.
+            if NowPlayingOwner.isVideo { VideoPlayerModel.shared.handle(command); return }
             switch command {
             case .toggle: self.togglePlay()
             case .next: self.next()
@@ -234,6 +236,7 @@ final class MusicPlayer {
     /// A minimized or Picture in Picture video would play over the music, and it leaves the
     /// session set up for movies.
     private func claimAudio() {
+        NowPlayingOwner.claim(.music)
         VideoPlayerModel.shared.player.pause()
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio)
     }
@@ -574,20 +577,40 @@ final class MusicPlayer {
         queueGeneration += 1
         queue = []; index = 0; isPlaying = false
         saveSession()
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        if !NowPlayingOwner.isVideo { MPNowPlayingInfoCenter.default().nowPlayingInfo = nil }
     }
 
     // MARK: Now playing / remote
 
+    /// The targets are registered once; while a video owns Now Playing they forward to it.
     private func setupRemoteCommands() {
         let center = MPRemoteCommandCenter.shared()
-        center.playCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.play() }; return .success }
-        center.pauseCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.pause() }; return .success }
-        center.togglePlayPauseCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.togglePlay() }; return .success }
-        center.nextTrackCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.next() }; return .success }
-        center.previousTrackCommand.addTarget { [weak self] _ in MainActor.assumeIsolated { self?.previous() }; return .success }
+        center.playCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { if NowPlayingOwner.isVideo { VideoPlayerModel.shared.play() } else { self?.play() } }
+            return .success
+        }
+        center.pauseCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { if NowPlayingOwner.isVideo { VideoPlayerModel.shared.pause() } else { self?.pause() } }
+            return .success
+        }
+        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { if NowPlayingOwner.isVideo { VideoPlayerModel.shared.handle(.toggle) } else { self?.togglePlay() } }
+            return .success
+        }
+        center.nextTrackCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { if NowPlayingOwner.isVideo { VideoPlayerModel.shared.handle(.next) } else { self?.next() } }
+            return .success
+        }
+        center.previousTrackCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { if NowPlayingOwner.isVideo { VideoPlayerModel.shared.handle(.previous) } else { self?.previous() } }
+            return .success
+        }
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
-            if let e = event as? MPChangePlaybackPositionCommandEvent { MainActor.assumeIsolated { self?.seek(to: e.positionTime) } }
+            if let e = event as? MPChangePlaybackPositionCommandEvent {
+                MainActor.assumeIsolated {
+                    if NowPlayingOwner.isVideo { VideoPlayerModel.shared.seek(to: e.positionTime) } else { self?.seek(to: e.positionTime) }
+                }
+            }
             return .success
         }
         center.changeShuffleModeCommand.addTarget { [weak self] event in
@@ -603,7 +626,7 @@ final class MusicPlayer {
         center.changePlaybackRateCommand.supportedPlaybackRates = [0.75, 1, 1.25, 1.5, 2]
         center.changePlaybackRateCommand.addTarget { [weak self] event in
             guard let e = event as? MPChangePlaybackRateCommandEvent else { return .commandFailed }
-            MainActor.assumeIsolated { self?.rate = e.playbackRate }
+            MainActor.assumeIsolated { if NowPlayingOwner.isVideo { VideoPlayerModel.shared.setRate(e.playbackRate) } else { self?.rate = e.playbackRate } }
             return .success
         }
         center.likeCommand.localizedTitle = String(localized: "Like")
@@ -619,6 +642,8 @@ final class MusicPlayer {
     }
 
     func updateNowPlaying() {
+        // A video owns the system's Now Playing: leave it alone, but keep the widgets current.
+        guard !NowPlayingOwner.isVideo else { WidgetSync.update(self); return }
         guard let song = current else { MPNowPlayingInfoCenter.default().nowPlayingInfo = nil; return }
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: song.title,

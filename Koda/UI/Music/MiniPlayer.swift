@@ -48,7 +48,7 @@ struct VideoMiniPlayer: View {
                 .frame(width: 52, height: 30)
             Text(video.current?.title ?? "").font(.subheadline.weight(.semibold)).lineLimit(1)
             Spacer(minLength: 4)
-            Button { video.isPlaying ? video.player.pause() : video.player.play() } label: {
+            Button { video.togglePlay() } label: {
                 Image(systemName: video.isPlaying ? "pause.fill" : "play.fill").font(.title3)
                     .contentTransition(.symbolEffect(.replace)).frame(width: 32, height: 32)
                     .miniPlayerHitArea()

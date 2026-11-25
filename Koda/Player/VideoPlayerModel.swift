@@ -1,6 +1,8 @@
 import AVFoundation
 import AVKit
+import MediaPlayer
 import Observation
+import SwiftUI
 import UIKit
 
 nonisolated struct Chapter: Identifiable, Hashable { var id: Double { time }; var time: Double; var title: String }
@@ -39,6 +41,11 @@ enum VideoQualityCap: String, CaseIterable, Identifiable {
 /// The video surface: HLS playback through AVPlayer (adaptive up to 2160p60,
 /// AirPlay and Picture in Picture for free), video queue with autoplay,
 /// chapters, SponsorBlock, resume positions and watch history.
+///
+/// Two queues: `userQueue` holds what the viewer chose (Play Next, Add to Queue, Play all) and always
+/// plays first; `queue` is the automatic Up next (the list a video was opened from, else its related
+/// videos), which only plays by itself when the autoplay setting allows and the viewer queued nothing.
+/// When the viewer's queue runs out, playback stops.
 @MainActor
 @Observable
 final class VideoPlayerModel {
@@ -53,7 +60,15 @@ final class VideoPlayerModel {
     var chapters: [Chapter] = []
     var segments: [SponsorSegment] = []
     var skippedNotice: String?
-    var queue: [Video] = []
+    var queue: [Video] = [] { didSet { updateNowPlaying() } }
+    /// The viewer's own queue, saved across launches.
+    var userQueue: [Video] = VideoPlayerModel.loadUserQueue() {
+        didSet { saveUserQueue(); updateNowPlaying() }
+    }
+    /// The current video came from the viewer's queue (or Play all): when that queue is empty at its
+    /// end, playback stops instead of autoplaying a related video.
+    private(set) var playingFromUserQueue = false
+    var isPictureInPictureActive = false
     var audioTracks: [AudioTrackOption] = []
     var selectedAudio: AudioTrackOption?
     var captionTracks: [CaptionTrack] = []
@@ -74,6 +89,14 @@ final class VideoPlayerModel {
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var rateObservation: NSKeyValueObservation?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
+    @ObservationIgnored private var jumpObserver: NSObjectProtocol?
+    @ObservationIgnored private var speedObservation: NSKeyValueObservation?
+    /// The video played to its end and nothing followed it.
+    @ObservationIgnored private var stoppedAtEnd = false
+    /// The stream's length from the player response, until the item knows its own.
+    @ObservationIgnored private var knownDuration: Double = 0
+    @ObservationIgnored private var artworkCache: (id: String, artwork: MPMediaItemArtwork)?
+    @ObservationIgnored private var artworkLoadingId: String?
 
     var library: LibraryStore { .shared }
 
@@ -82,11 +105,24 @@ final class VideoPlayerModel {
         // Koda chooses the audio rendition itself: the original track unless the viewer picks a dub,
         // rather than AVPlayer's automatic match to the device language.
         player.appliesMediaSelectionCriteriaAutomatically = false
+        // Keep the sound going when the app leaves the screen without Picture in Picture.
+        player.audiovisualBackgroundPlaybackPolicy = .continuesIfPossible
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.2, preferredTimescale: 600), queue: .main) { [weak self] t in
             MainActor.assumeIsolated { self?.tick(t.seconds) }
         }
         rateObservation = player.observe(\.timeControlStatus) { @Sendable [weak self] p, _ in
-            Task { @MainActor in self?.isPlaying = p.timeControlStatus != .paused }
+            Task { @MainActor in self?.playbackStateChanged(p.timeControlStatus != .paused) }
+        }
+        speedObservation = player.observe(\.rate) { @Sendable [weak self] _, _ in
+            Task { @MainActor in self?.updateNowPlaying() }
+        }
+        // Any seek (scrubbing, chapters, SponsorBlock, the Lock Screen) moves the published position.
+        jumpObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.timeJumpedNotification, object: nil, queue: .main) { [weak self] note in
+            let jumped = (note.object as AnyObject?).map(ObjectIdentifier.init)
+            MainActor.assumeIsolated {
+                guard let self, let jumped, let current = self.player.currentItem, jumped == ObjectIdentifier(current) else { return }
+                self.updateNowPlaying()
+            }
         }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] note in
             // Compare identities, so the non-Sendable notification never crosses into the main actor.
@@ -99,9 +135,17 @@ final class VideoPlayerModel {
     }
 
     func open(_ video: Video, queue: [Video] = []) {
+        open(video, queue: queue, fromUserQueue: false)
+    }
+
+    private func open(_ video: Video, queue: [Video], fromUserQueue: Bool) {
+        NowPlayingOwner.claim(.video)
         MusicPlayer.shared.pause()
         if current?.id == video.id { isPresented = true; return }
         saveProgress()
+        playingFromUserQueue = fromUserQueue
+        stoppedAtEnd = false
+        knownDuration = video.durationText?.durationSeconds.map(Double.init) ?? 0
         current = video
         details = nil
         chapters = []
@@ -116,6 +160,7 @@ final class VideoPlayerModel {
         isPresented = true
         library.recordWatch(video)
         load(video)
+        updateNowPlaying()
     }
 
     func close() {
@@ -125,6 +170,52 @@ final class VideoPlayerModel {
         current = nil
         details = nil
         isPresented = false
+        playingFromUserQueue = false
+        stoppedAtEnd = false
+        // Now Playing and the Live Activity go back to the music, or away if there is none.
+        updateNowPlaying()
+        NowPlayingOwner.claim(.music)
+        MusicPlayer.shared.updateNowPlaying()
+    }
+
+    // MARK: Transport
+
+    func play() {
+        guard current != nil else { return }
+        NowPlayingOwner.claim(.video)
+        if MusicPlayer.shared.isPlaying { MusicPlayer.shared.pause() }
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        if stoppedAtEnd { stoppedAtEnd = false; seek(to: 0) }
+        player.play()
+    }
+
+    func pause() { player.pause() }
+
+    func togglePlay() { isPlaying ? pause() : play() }
+
+    func setRate(_ rate: Float) {
+        player.defaultRate = rate
+        if isPlaying { player.rate = rate }
+    }
+
+    /// Widget, Live Activity and Control Center buttons while the video owns Now Playing.
+    func handle(_ command: PlaybackCommand) {
+        switch command {
+        case .toggle: togglePlay()
+        case .next: if hasNext { playNext() }
+        case .previous: seek(to: 0)
+        case .like: if let current { library.toggleVideoLike(current) }
+        }
+    }
+
+    private func playbackStateChanged(_ playing: Bool) {
+        isPlaying = playing
+        if playing, !NowPlayingOwner.isVideo, current != nil {
+            // Started from the video's own controls while music had Now Playing.
+            NowPlayingOwner.claim(.video)
+            if MusicPlayer.shared.isPlaying { MusicPlayer.shared.pause() }
+        }
+        updateNowPlaying()
     }
 
     private func load(_ video: Video) {
@@ -139,6 +230,7 @@ final class VideoPlayerModel {
                 let info = try await InnerTube.shared.player(videoId: video.id)
                 guard !Task.isCancelled, current?.id == video.id else { return }
                 guard let url = info.hlsURL else { throw InnerTubeError.noStream }
+                if info.duration > 0 { knownDuration = Double(info.duration) }
                 let item = AVPlayerItem(asset: AVURLAsset(url: url))
                 item.preferredMaximumResolution = quality.size
                 item.externalMetadata = Self.metadata(title: info.title, artist: info.author)
@@ -164,7 +256,8 @@ final class VideoPlayerModel {
                     await player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
                 }
                 guard !Task.isCancelled, current?.id == video.id else { return }
-                player.play()
+                // Music started while this loaded: it keeps playing, and the video waits.
+                if NowPlayingOwner.isVideo { player.play() }
                 isLoading = false
                 errorMessage = nil
             } catch {
@@ -189,6 +282,7 @@ final class VideoPlayerModel {
                 if queue.isEmpty { queue = library.filtered(d.related) }
             }
             segments = s
+            updateNowPlaying()
         }
     }
 
@@ -205,16 +299,164 @@ final class VideoPlayerModel {
 
     private func ended() {
         saveProgress(finished: true)
-        guard UserDefaults.standard.object(forKey: "videoAutoplay") as? Bool ?? true, !queue.isEmpty else { return }
+        // The viewer's queue plays whatever the autoplay setting says.
+        if !userQueue.isEmpty { playNext(); return }
+        // It ran out: stop, rather than carry on with a related video.
+        guard !playingFromUserQueue, UserDefaults.standard.object(forKey: "videoAutoplay") as? Bool ?? true, !queue.isEmpty else {
+            stoppedAtEnd = true
+            updateNowPlaying()
+            return
+        }
         playNext()
     }
 
+    /// Whether next has something to play: the viewer's queue, else (unless that queue just ran out) Up next.
+    var hasNext: Bool { !userQueue.isEmpty || (!playingFromUserQueue && !queue.isEmpty) }
+
+    /// The automatic Up next, when it is what plays after this video.
+    var autoNext: Video? { userQueue.isEmpty && !playingFromUserQueue ? queue.first : nil }
+
     func playNext() {
+        if !userQueue.isEmpty {
+            playFromUserQueue(userQueue.removeFirst())
+            return
+        }
         guard !queue.isEmpty else { return }
         let next = queue.removeFirst()
         let rest = queue
         current = nil
         open(next, queue: rest)
+    }
+
+    // MARK: The viewer's queue
+
+    /// Whether queueing a video starts it right away: nothing is playing, or the last video finished.
+    var queueStartsNow: Bool { current == nil || stoppedAtEnd }
+
+    /// True when the video was queued, false when it started playing because nothing else was.
+    @discardableResult func addToQueue(_ video: Video) -> Bool { enqueue(video, next: false) }
+
+    @discardableResult func playNextInQueue(_ video: Video) -> Bool { enqueue(video, next: true) }
+
+    /// Nothing to wait for (no video, or the last one finished): the queue starts now.
+    private func enqueue(_ video: Video, next: Bool) -> Bool {
+        if queueStartsNow {
+            if next || userQueue.isEmpty { playFromUserQueue(video); return false }
+            userQueue.removeAll { $0.id == video.id }
+            userQueue.append(video)
+            playNext()
+            return false
+        }
+        guard video.id != current?.id else { return true }
+        userQueue.removeAll { $0.id == video.id }
+        if next { userQueue.insert(video, at: 0) } else { userQueue.append(video) }
+        return true
+    }
+
+    /// Play all: the first video now, the rest in the viewer's queue, then stop.
+    func playAll(_ videos: [Video]) {
+        guard let first = videos.first else { return }
+        var seen: Set<String> = [first.id]
+        userQueue = videos.dropFirst().filter { seen.insert($0.id).inserted }
+        playFromUserQueue(first)
+    }
+
+    func playQueued(at index: Int) {
+        guard userQueue.indices.contains(index) else { return }
+        playFromUserQueue(userQueue.remove(at: index))
+    }
+
+    func moveQueue(from source: IndexSet, to destination: Int) { userQueue.move(fromOffsets: source, toOffset: destination) }
+
+    func removeFromQueue(at offsets: IndexSet) { userQueue.remove(atOffsets: offsets) }
+
+    func clearQueue() { userQueue = [] }
+
+    private func playFromUserQueue(_ video: Video) {
+        // Up next is rebuilt from this video's related videos.
+        queue = []
+        if current?.id == video.id { current = nil }
+        open(video, queue: [], fromUserQueue: true)
+    }
+
+    private static let userQueueKey = "videoUserQueue"
+
+    private static func loadUserQueue() -> [Video] {
+        guard let data = UserDefaults.standard.data(forKey: userQueueKey) else { return [] }
+        return (try? JSONDecoder().decode([Video].self, from: data)) ?? []
+    }
+
+    private func saveUserQueue() {
+        UserDefaults.standard.set(try? JSONEncoder().encode(userQueue), forKey: Self.userQueueKey)
+    }
+
+    // MARK: Now Playing
+
+    var nowPlayingTitle: String { details?.title ?? current?.title ?? "" }
+    var nowPlayingChannel: String { details?.channel.name ?? current?.channel ?? "" }
+
+    var elapsed: Double {
+        let t = player.currentTime().seconds
+        return t.isFinite ? max(t, 0) : 0
+    }
+
+    var duration: Double {
+        if let d = player.currentItem?.duration.seconds, d.isFinite, d > 0 { return d }
+        return knownDuration
+    }
+
+    /// Publishes the video to the Lock Screen, Control Center and the Live Activity while it owns them.
+    func updateNowPlaying() {
+        guard NowPlayingOwner.isVideo else { return }
+        let commands = MPRemoteCommandCenter.shared()
+        commands.nextTrackCommand.isEnabled = hasNext
+        commands.previousTrackCommand.isEnabled = current != nil
+        defer { LiveActivitySync.updateVideo(self) }
+        guard let video = current else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            MPNowPlayingInfoCenter.default().playbackState = .stopped
+            return
+        }
+        let isLive = video.isLive || (player.currentItem?.duration.isIndefinite ?? false)
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: nowPlayingTitle,
+            MPMediaItemPropertyArtist: nowPlayingChannel,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? Double(player.rate == 0 ? player.defaultRate : player.rate) : 0,
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: Double(player.defaultRate),
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
+            MPNowPlayingInfoPropertyIsLiveStream: isLive,
+        ]
+        if !isLive { info[MPMediaItemPropertyPlaybackDuration] = duration }
+        if let cached = artworkCache, cached.id == video.id {
+            info[MPMediaItemPropertyArtwork] = cached.artwork
+        } else if let url = video.thumbnailURL, artworkLoadingId != video.id {
+            artworkLoadingId = video.id
+            Task {
+                let image = (try? await URLSession.shared.data(from: url)).flatMap { UIImage(data: $0.0) }.map(Self.removingLetterbox)
+                if self.artworkLoadingId == video.id { self.artworkLoadingId = nil }
+                // The video may have changed while the thumbnail loaded.
+                guard let image, self.current?.id == video.id else { return }
+                self.artworkCache = (video.id, Self.artwork(image))
+                LiveActivitySync.saveVideoArtwork(image, videoId: video.id)
+                self.updateNowPlaying()
+            }
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
+    }
+
+    /// MediaPlayer asks for the image on its own queue, so the closure must not be main-actor isolated.
+    nonisolated private static func artwork(_ image: UIImage) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in image }
+    }
+
+    /// YouTube's hqdefault thumbnails are 4:3 with black bars around a 16:9 picture: keep the picture.
+    private static func removingLetterbox(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage, abs(Double(cg.width) / Double(max(cg.height, 1)) - 4.0 / 3.0) < 0.05 else { return image }
+        let bar = Int(Double(cg.height) * 0.125)
+        guard let cropped = cg.cropping(to: CGRect(x: 0, y: bar, width: cg.width, height: cg.height - 2 * bar)) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
     }
 
     // MARK: Audio tracks (dubbing)

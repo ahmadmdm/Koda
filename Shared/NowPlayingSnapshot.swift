@@ -35,6 +35,8 @@ nonisolated struct NowPlayingSnapshot: Codable, Hashable, Sendable {
 
     static var fileURL: URL? { containerURL?.appendingPathComponent("now-playing.json") }
     static var artworkURL: URL? { containerURL?.appendingPathComponent("now-playing-artwork.jpg") }
+    /// The playing video's thumbnail for the Live Activity, apart from the music artwork the widgets show.
+    static var videoArtworkURL: URL? { containerURL?.appendingPathComponent("now-playing-video-artwork.jpg") }
 
     static func load() -> NowPlayingSnapshot? {
         guard let url = fileURL, let data = try? Data(contentsOf: url) else { return nil }

@@ -32,8 +32,10 @@ struct NowPlayingLiveActivity: Widget {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    LiveActivityProgress(state: state)
-                        .padding(.top, 4)
+                    if state.duration > 0 {
+                        LiveActivityProgress(state: state)
+                            .padding(.top, 4)
+                    }
                 }
             } compactLeading: {
                 LiveActivityArtwork(state: state, cornerRadius: 6, maxPixels: 72)
@@ -67,13 +69,15 @@ struct LiveActivityLockScreen: View {
                 Spacer(minLength: 4)
                 LiveActivityControls(state: state, size: 38)
             }
-            LiveActivityProgress(state: state)
+            // A live stream has no length to show progress against.
+            if state.duration > 0 { LiveActivityProgress(state: state) }
         }
         .padding(16)
     }
 }
 
-/// The small artwork copy in the App Group; a gradient until the app has written this song's.
+/// The small artwork copy in the App Group (the video thumbnail's for a video); a gradient until the
+/// app has written this song's.
 struct LiveActivityArtwork: View {
     var state: NowPlayingActivityAttributes.ContentState
     var cornerRadius: CGFloat
@@ -83,13 +87,13 @@ struct LiveActivityArtwork: View {
 
     var body: some View {
         Group {
-            if state.hasArtwork, let url = NowPlayingSnapshot.artworkURL, let image = UIImage(contentsOfFile: url.path)?
+            if state.hasArtwork, let url = state.showsVideo ? NowPlayingSnapshot.videoArtworkURL : NowPlayingSnapshot.artworkURL, let image = UIImage(contentsOfFile: url.path)?
                 .preparingThumbnail(of: CGSize(width: maxPixels, height: maxPixels)) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 ZStack {
                     LinearGradient(colors: [.purple, .indigo], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    Image(systemName: "music.note").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.85))
+                    Image(systemName: state.showsVideo ? "play.rectangle.fill" : "music.note").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.85))
                 }
             }
         }
@@ -105,7 +109,9 @@ struct LiveActivityControls: View {
         HStack(spacing: 8) {
             ControlButton(intent: TogglePlaybackIntent(), systemImage: state.isPlaying ? "pause.fill" : "play.fill",
                           size: size, prominent: true)
-            ControlButton(intent: NextTrackIntent(), systemImage: "forward.fill", size: size * 0.86)
+            if state.showsNext {
+                ControlButton(intent: NextTrackIntent(), systemImage: "forward.fill", size: size * 0.86)
+            }
         }
         // Transport keeps its direction in right-to-left languages, as in Apple Music.
         .environment(\.layoutDirection, .leftToRight)

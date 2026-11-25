@@ -404,6 +404,17 @@ struct ShortPageView: View {
                     let video = video
                     onLeave { VideoPlayerModel.shared.open(video) }
                 }
+                Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                    let video = video
+                    // Nothing playing: the video starts in the player, so leave the Shorts first.
+                    if VideoPlayerModel.shared.queueStartsNow { onLeave { VideoPlayerModel.shared.playNextInQueue(video) } }
+                    else { VideoPlayerModel.shared.playNextInQueue(video) }
+                }
+                Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+                    let video = video
+                    if VideoPlayerModel.shared.queueStartsNow { onLeave { VideoPlayerModel.shared.addToQueue(video) } }
+                    else { VideoPlayerModel.shared.addToQueue(video) }
+                }
                 Button("Play as Audio", systemImage: "headphones") {
                     let song = video.asSong
                     onLeave { MusicPlayer.shared.play([song], radio: true) }

@@ -8,6 +8,9 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
         vc.player = player
         vc.allowsPictureInPicturePlayback = true
         vc.canStartPictureInPictureAutomaticallyFromInline = true
+        // VideoPlayerModel publishes Now Playing itself, and only while the video owns it.
+        vc.updatesNowPlayingInfoCenter = false
+        vc.delegate = context.coordinator
         vc.speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map { AVPlaybackSpeed(rate: $0, localizedName: $0.speedLabel) }
         vc.entersFullScreenWhenPlaybackBegins = false
         vc.exitsFullScreenWhenPlaybackEnds = true
@@ -33,7 +36,24 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator { var host: UIViewController? }
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        var host: UIViewController?
+
+        func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
+            VideoPlayerModel.shared.isPictureInPictureActive = true
+        }
+
+        func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
+            VideoPlayerModel.shared.isPictureInPictureActive = false
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void) {
+            // Back from the floating window: bring the watch page back if it was minimized.
+            VideoPlayerModel.shared.isPresented = true
+            completionHandler(true)
+        }
+    }
 }
 
 /// Subtitles drawn over the video, in the style of the system captions.
@@ -238,7 +258,8 @@ struct WatchView: View {
     }
 
     @ViewBuilder private var upNextAndRelated: some View {
-        if let next = model.queue.first {
+        if !model.userQueue.isEmpty { VideoQueueSection() }
+        if let next = model.autoNext {
             HStack {
                 Text("Up next").font(.headline)
                 Spacer()
@@ -248,7 +269,7 @@ struct WatchView: View {
         }
         if let related = model.details?.related, !related.isEmpty {
             Text("Related").font(.headline)
-            ForEach(library.filtered(related).filter { $0.id != model.queue.first?.id }) { v in
+            ForEach(library.filtered(related).filter { $0.id != model.autoNext?.id }) { v in
                 VideoCard(video: v, compact: true, queue: library.filtered(related))
             }
         }

@@ -4,7 +4,8 @@ import UIKit
 
 /// Starts, updates and ends the music Live Activity. Called from `WidgetSync`, so it follows every
 /// song change, play, pause, seek and stop. Progress runs on the clock in the widget, so the activity
-/// is only updated when something it shows changes.
+/// is only updated when something it shows changes. While a video owns Now Playing, the same activity
+/// shows the video instead, driven by `VideoPlayerModel` through `updateVideo`.
 @MainActor
 enum LiveActivitySync {
     static let enabledKey = "liveActivity"
@@ -14,10 +15,13 @@ enum LiveActivitySync {
     private static var activity: Activity<NowPlayingActivityAttributes>?
     private static var lastState: State?
     private static var artworkSongId: String?
+    private static var videoArtworkId: String?
     private static var adopted = false
 
     static func update(_ player: MusicPlayer) {
         adoptExisting()
+        // The video player drives the activity while it owns Now Playing.
+        guard !NowPlayingOwner.isVideo else { return }
         guard isEnabled, ActivityAuthorizationInfo().areActivitiesEnabled, let song = player.current else {
             end()
             return
@@ -25,6 +29,26 @@ enum LiveActivitySync {
         let state = State(songId: song.id, title: song.title, artist: song.artist, isPlaying: player.isPlaying,
                           elapsed: player.currentTime, duration: player.duration, capturedAt: .now,
                           artworkSongId: artworkSongId)
+        apply(state)
+    }
+
+    /// The playing video, while it owns Now Playing.
+    static func updateVideo(_ model: VideoPlayerModel) {
+        adoptExisting()
+        guard NowPlayingOwner.isVideo else { return }
+        guard isEnabled, ActivityAuthorizationInfo().areActivitiesEnabled, let video = model.current else {
+            end()
+            return
+        }
+        var state = State(songId: video.id, title: model.nowPlayingTitle, artist: model.nowPlayingChannel,
+                          isPlaying: model.isPlaying, elapsed: model.elapsed, duration: model.duration,
+                          capturedAt: .now, artworkSongId: videoArtworkId)
+        state.isVideo = true
+        state.hasNext = model.hasNext
+        apply(state)
+    }
+
+    private static func apply(_ state: State) {
         let previous = lastState
         if let activity, activity.activityState == .active || activity.activityState == .stale {
             guard changed(from: previous, to: state) else { return }
@@ -50,13 +74,33 @@ enum LiveActivitySync {
     /// While playing, the activity goes stale when the song should have ended: if the app was closed
     /// meanwhile, nothing else would tell the system it stopped.
     private static func content(_ state: State) -> ActivityContent<State> {
-        ActivityContent(state: state, staleDate: state.isPlaying ? state.endDate : nil)
+        // A live stream has no end to go stale at.
+        ActivityContent(state: state, staleDate: state.isPlaying && state.duration > 0 ? state.endDate : nil)
     }
 
     /// `WidgetSync` wrote the App Group artwork for this song.
     static func artworkSaved(songId: String) {
         artworkSongId = songId
         update(MusicPlayer.shared)
+    }
+
+    /// Writes the video's thumbnail for the activity: a small square JPEG cut from its centre (the
+    /// Dynamic Island shows a blank for large images).
+    static func saveVideoArtwork(_ image: UIImage, videoId: String) {
+        guard videoId != videoArtworkId, let url = NowPlayingSnapshot.videoArtworkURL else { return }
+        let content = CGRect(origin: .zero, size: image.size)
+        let side: CGFloat = 200
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format)
+        let square = renderer.image { _ in
+            let scale = max(side / content.width, side / content.height)
+            let origin = CGPoint(x: side / 2 - content.midX * scale, y: side / 2 - content.midY * scale)
+            image.draw(in: CGRect(origin: origin, size: CGSize(width: image.size.width * scale, height: image.size.height * scale)))
+        }
+        guard (try? square.jpegData(compressionQuality: 0.8)?.write(to: url, options: .atomic)) != nil else { return }
+        videoArtworkId = videoId
+        updateVideo(.shared)
     }
 
     static func end() {
@@ -96,6 +140,7 @@ enum LiveActivitySync {
         guard let old else { return true }
         if old.songId != new.songId || old.title != new.title || old.artist != new.artist
             || old.isPlaying != new.isPlaying || old.artworkSongId != new.artworkSongId
+            || old.isVideo != new.isVideo || old.hasNext != new.hasNext
             || Int(old.duration) != Int(new.duration) { return true }
         // A seek: the clock-based start no longer matches (or, while paused, the position moved).
         return new.isPlaying

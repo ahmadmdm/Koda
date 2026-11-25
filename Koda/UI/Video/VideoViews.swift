@@ -65,6 +65,12 @@ struct VideoCard: View {
     }
 
     @ViewBuilder private var menu: some View {
+        Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+            if player.playNextInQueue(video) { app.showToast("Playing next") }
+        }
+        Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") {
+            if player.addToQueue(video) { app.showToast("Added to queue") }
+        }
         Button(library.isInWatchLater(video.id) ? "Remove from Watch Later" : "Watch Later", systemImage: "clock") { library.toggleWatchLater(video) }
         Button("Play as Audio", systemImage: "headphones") { MusicPlayer.shared.play([video.asSong], radio: true) }
         Button("Add Audio to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { MusicPlayer.shared.addToQueue([video.asSong]) }
@@ -343,11 +349,12 @@ struct VideoPlaylistView: View {
     @State private var error: String?
     @State private var loaded = false
     @Environment(VideoPlayerModel.self) private var player
+    @Environment(LibraryStore.self) private var library
 
     var body: some View {
         List {
             if !videos.isEmpty {
-                Button { player.open(videos[0], queue: Array(videos.dropFirst())) } label: { Label("Play all", systemImage: "play.fill").frame(maxWidth: .infinity) }
+                Button { player.playAll(library.filtered(videos)) } label: { Label("Play all", systemImage: "play.fill").frame(maxWidth: .infinity) }
                     .buttonStyle(.glassProminent).controlSize(.large).listRowBackground(Color.clear)
             }
             ForEach(videos) { VideoCard(video: $0, compact: true, queue: videos) }
