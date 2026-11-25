@@ -1,3 +1,4 @@
+import os
 import Foundation
 
 nonisolated enum InnerTubeError: LocalizedError {
@@ -135,38 +136,87 @@ nonisolated final class InnerTube: Sendable {
         return String((0..<n).map { _ in alphabet.randomElement()! })
     }
 
-    func player(videoId: String) async throws -> StreamInfo {
+    /// One `/player` client identity. A stream URL is bound to the client that resolved it (its `c=`),
+    /// and googlevideo can refuse a fetch whose User-Agent belongs to another client.
+    nonisolated struct PlayerClient: Sendable {
+        var name: String, version: String, id: String, userAgent: String
+        var fields: [String: Any & Sendable]
+        var sendsNonce = false
+    }
+
+    static let visionOS = PlayerClient(name: "VISIONOS", version: "1.02", id: "101", userAgent: visionUA, fields: [
+        "clientScreen": "WATCH", "platform": "MOBILE", "deviceMake": "Apple",
+        "deviceModel": "RealityDevice14,1", "osName": "visionOS", "osVersion": "25.6.0.23O471",
+    ], sendsNonce: true)
+    static let iosUA = "com.google.ios.youtube/21.02.3 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)"
+    static let iOSClient = PlayerClient(name: "IOS", version: "21.02.3", id: "5", userAgent: iosUA, fields: [
+        "deviceMake": "Apple", "deviceModel": "iPhone16,2", "osName": "iPhone", "osVersion": "18.1.0.22B83",
+    ])
+    static let androidVRUA = "com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip"
+    static let androidVR = PlayerClient(name: "ANDROID_VR", version: "1.65.10", id: "28", userAgent: androidVRUA, fields: [
+        "androidSdkVersion": 32, "deviceMake": "Oculus", "deviceModel": "Quest 3", "osName": "Android", "osVersion": "12L",
+    ])
+
+    /// The User-Agent a fetch of `url` must send: the one of the client named in its `c=`.
+    static func userAgent(for url: URL) -> String {
+        let c = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "c" }?.value
+        switch c {
+        case "IOS": return iosUA
+        case "ANDROID_VR": return androidVRUA
+        default: return visionUA
+        }
+    }
+
+    /// Streams for a video, as the Android app resolves them: visionOS under the current
+    /// visitorData, visionOS again under a fresh one (a refused token reads as "This video is
+    /// unavailable"), then IOS and ANDROID_VR as the last resort. Only a reason every client
+    /// agrees on (age, region, private) is reported.
+    /// `quick` asks visionOS once, for probing alternates where a refusal is the expected answer.
+    func player(videoId: String, quick: Bool = false) async throws -> StreamInfo {
+        let attempts: [(PlayerClient, Bool)] = quick ? [(Self.visionOS, false)] : [
+            (Self.visionOS, false), (Self.visionOS, true), (Self.iOSClient, false), (Self.androidVR, false),
+        ]
         var lastError: Error = InnerTubeError.noStream
-        for attempt in 0..<2 {
-            let vd = await visitorData(forceNew: attempt > 0)
-            let body: [String: Any] = [
-                "videoId": videoId,
-                "context": ["client": [
-                    "clientName": "VISIONOS", "clientVersion": "1.02", "hl": language, "gl": region, "utcOffsetMinutes": 0,
-                    "visitorData": vd, "clientScreen": "WATCH", "platform": "MOBILE", "deviceMake": "Apple",
-                    "deviceModel": "RealityDevice14,1", "osName": "visionOS", "osVersion": "25.6.0.23O471",
-                ]],
-                "contentPlaybackNonce": Self.nonce(16), "t": Self.nonce(12),
-                "contentCheckOk": true, "racyCheckOk": true,
-            ]
+        for (client, freshToken) in attempts {
+            let vd = await visitorData(forceNew: freshToken)
             do {
-                let root = try await post("https://youtubei.googleapis.com/youtubei/v1/player?key=\(Self.apiKey)&prettyPrint=false", body: body, headers: [
-                    "User-Agent": Self.visionUA, "X-Goog-Api-Format-Version": "2", "X-YouTube-Client-Name": "101",
-                    "X-YouTube-Client-Version": "1.02", "Origin": "https://www.youtube.com", "X-Goog-Visitor-Id": vd,
-                ])
+                let root = try await player(videoId: videoId, client: client, visitorData: vd)
                 let status = root.path("playabilityStatus.status").string ?? ""
-                if status == "LOGIN_REQUIRED" { lastError = InnerTubeError.unplayable(root.path("playabilityStatus.reason").string ?? "Sign-in required"); continue }
-                if !status.isEmpty && status != "OK" {
-                    throw InnerTubeError.unplayable(root.path("playabilityStatus.reason").string ?? status)
+                guard status == "OK" || status.isEmpty else {
+                    lastError = InnerTubeError.unplayable(root.path("playabilityStatus.reason").string ?? status)
+                    playbackLog.info("player \(client.name, privacy: .public) \(videoId, privacy: .public): \(status, privacy: .public) hl=\(self.language, privacy: .public) gl=\(self.region, privacy: .public) reason=\(root.path("playabilityStatus.reason").string ?? "", privacy: .public) sub=\(root.path("playabilityStatus.errorScreen.playerErrorMessageRenderer.subreason").text ?? "", privacy: .public)")
+                    continue
                 }
-                guard root["streamingData"].exists else { lastError = InnerTubeError.noStream; continue }
-                return Self.parseStream(root)
-            } catch let error as InnerTubeError {
-                if case .unplayable = error { throw error }
+                let info = Self.parseStream(root)
+                guard info.audioURL != nil || info.hlsURL != nil else { lastError = InnerTubeError.noStream; continue }
+                return info
+            } catch {
                 lastError = error
             }
         }
         throw lastError
+    }
+
+    private func player(videoId: String, client: PlayerClient, visitorData vd: String) async throws -> J {
+        var context: [String: Any] = client.fields
+        context["clientName"] = client.name
+        context["clientVersion"] = client.version
+        context["hl"] = language
+        context["gl"] = region
+        context["utcOffsetMinutes"] = 0
+        context["visitorData"] = vd
+        var body: [String: Any] = [
+            "videoId": videoId, "context": ["client": context],
+            "contentCheckOk": true, "racyCheckOk": true,
+        ]
+        if client.sendsNonce {
+            body["contentPlaybackNonce"] = Self.nonce(16)
+            body["t"] = Self.nonce(12)
+        }
+        return try await post("https://youtubei.googleapis.com/youtubei/v1/player?key=\(Self.apiKey)&prettyPrint=false", body: body, headers: [
+            "User-Agent": client.userAgent, "X-Goog-Api-Format-Version": "2", "X-YouTube-Client-Name": client.id,
+            "X-YouTube-Client-Version": client.version, "Origin": "https://www.youtube.com", "X-Goog-Visitor-Id": vd,
+        ])
     }
 
     static func parseStream(_ root: J) -> StreamInfo {

@@ -61,7 +61,7 @@ final class DownloadManager {
             guard let url = quality == "saver" ? (info.lowAudioURL ?? info.audioURL) : info.audioURL else { throw InnerTubeError.noStream }
             let fileName = "\(song.id).m4a"
             let target = Self.directory.appendingPathComponent(fileName)
-            let bytes = try await Self.fetchRanged(url, progress: { progress in
+            let bytes = try await Self.fetchRanged(url, userAgent: InnerTube.userAgent(for: url), progress: { progress in
                 Task { @MainActor in if self.active[song.id] != nil { self.active[song.id] = .downloading(progress) } }
             }, to: target)
             var saved = song

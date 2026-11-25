@@ -3,6 +3,9 @@ import AVFoundation
 import MediaPlayer
 import Observation
 import UIKit
+import os
+
+nonisolated let playbackLog = Logger(subsystem: "com.koda.ios", category: "playback")
 
 enum RepeatMode: String, CaseIterable { case off, all, one
     var icon: String { self == .one ? "repeat.1" : "repeat" }
@@ -51,6 +54,9 @@ final class MusicPlayer {
     @ObservationIgnored private var lastTick: Double = 0
     @ObservationIgnored private var artworkCache: (String, MPMediaItemArtwork)?
     @ObservationIgnored private var radioSeed: String?
+    /// The song the listener just picked. If it cannot play, say so and stay on it: skipping on
+    /// to the radio's next song made it look as if a different song had been chosen.
+    @ObservationIgnored private var chosenId: String?
 
     var library: LibraryStore { .shared }
 
@@ -93,6 +99,7 @@ final class MusicPlayer {
 
     func play(_ songs: [Song], startAt: Int = 0, shuffled: Bool = false, radio: Bool = false) {
         guard !songs.isEmpty else { return }
+        playbackLog.info("play \(songs[startAt].id, privacy: .public) \(songs[startAt].title, privacy: .public) radio=\(radio)")
         commitListening()
         var list = songs
         var start = startAt
@@ -107,6 +114,7 @@ final class MusicPlayer {
         index = min(start, list.count - 1)
         let radio = radio && !songs[startAt].isLocal
         radioSeed = radio ? songs[startAt].id : nil
+        chosenId = songs[startAt].id
         load(autoplay: true)
         if radio { Task { await extendWithRadio(seed: songs[startAt].id) } }
         saveSession()
@@ -262,7 +270,7 @@ final class MusicPlayer {
             do {
                 let (url, loudness) = try await streamURL(for: song)
                 guard !Task.isCancelled, self.current?.id == song.id else { return }
-                let asset = AVURLAsset(url: url, options: url.isFileURL ? nil : ["AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": InnerTube.visionUA]])
+                let asset = AVURLAsset(url: url, options: url.isFileURL ? nil : ["AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": InnerTube.userAgent(for: url)]])
                 let item = AVPlayerItem(asset: asset)
                 item.audioTimePitchAlgorithm = .timeDomain
                 item.preferredForwardBufferDuration = 30
@@ -293,11 +301,16 @@ final class MusicPlayer {
                 self.prefetchNext()
             } catch is CancellationError {
             } catch {
+                playbackLog.error("stream failed \(song.id, privacy: .public): \(String(describing: error), privacy: .public)")
                 guard self.current?.id == song.id else { return }
                 self.isLoading = false
                 self.isPlaying = false
                 self.errorMessage = error.localizedDescription
-                // Skip what cannot play, as the Android player does.
+                if song.id == self.chosenId {
+                    AppState.current?.showToast("Couldn't play \(song.title): \(error.localizedDescription)")
+                    return
+                }
+                // Skip what cannot play further down the queue, as the Android player does.
                 if self.index + 1 < self.queue.count {
                     try? await Task.sleep(for: .seconds(1.5))
                     if self.current?.id == song.id { self.next() }
@@ -307,6 +320,7 @@ final class MusicPlayer {
     }
 
     private func handleFailure(_ song: Song, error: Error?) {
+        playbackLog.error("item failed \(song.id, privacy: .public): \(String(describing: error), privacy: .public)")
         guard current?.id == song.id else { return }
         // A refused URL is usually the visitor token: forget it and resolve again once.
         if resolved[song.id] != nil {
@@ -327,7 +341,15 @@ final class MusicPlayer {
         }
         if let local = DownloadManager.shared.localURL(for: song.id) { return (local, nil) }
         if let cached = resolved[song.id], cached.expires > .now { return (cached.url, cached.loudness) }
-        let info = try await InnerTube.shared.player(videoId: song.id)
+        let info: StreamInfo
+        do {
+            info = try await InnerTube.shared.player(videoId: song.id)
+        } catch InnerTubeError.unplayable(let reason) {
+            // A label can block one upload on some networks while another upload of the same
+            // song plays: YouTube Music falls back to the song's other versions the same way.
+            guard let alternate = await Self.alternateStream(for: song) else { throw InnerTubeError.unplayable(reason) }
+            info = alternate
+        }
         let low = UserDefaults.standard.string(forKey: "musicQuality") == "low"
         guard let url = (low ? info.lowAudioURL : info.audioURL) ?? info.audioURL ?? info.hlsURL else { throw InnerTubeError.noStream }
         resolved[song.id] = (url, info.loudnessDb, Date().addingTimeInterval(5 * 3600))
@@ -336,6 +358,36 @@ final class MusicPlayer {
             if current?.id == song.id { duration = info.duration }
         }
         return (url, info.loudnessDb)
+    }
+
+    /// Another upload of the same song (its music video, a lyric video, a re-release) when the
+    /// one picked is unavailable here. Matches on title and artist so a different song never plays.
+    private static func alternateStream(for song: Song) async -> StreamInfo? {
+        let query = "\(song.title) \(song.artist)"
+        let songs = (try? await MusicAPI.search(query, filter: .songs).0) ?? []
+        let videos = (try? await MusicAPI.search(query, filter: .videos).0) ?? []
+        let wanted = normalized(song.title)
+        let candidates = (songs + videos).compactMap(\.song).filter { candidate in
+            candidate.id != song.id && !wanted.isEmpty
+                && (normalized(candidate.title).contains(wanted) || wanted.contains(normalized(candidate.title)))
+                && (song.artist.isEmpty || candidate.artist.localizedCaseInsensitiveContains(song.artist.components(separatedBy: ",")[0])
+                    || song.artist.localizedCaseInsensitiveContains(candidate.artist))
+        }
+        for candidate in candidates.prefix(6) {
+            if let info = try? await InnerTube.shared.player(videoId: candidate.id, quick: true) {
+                playbackLog.info("alternate \(candidate.id, privacy: .public) for \(song.id, privacy: .public)")
+                return info
+            }
+        }
+        return nil
+    }
+
+    /// Title without diacritics, punctuation and brackets, for matching uploads of one song.
+    private static func normalized(_ title: String) -> String {
+        let base = title.components(separatedBy: CharacterSet(charactersIn: "([")).first ?? title
+        return base.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
+            .unicodeScalars.filter { CharacterSet.letters.contains($0) || CharacterSet.decimalDigits.contains($0) }
+            .map(String.init).joined()
     }
 
     private func prefetchNext() {
@@ -366,6 +418,7 @@ final class MusicPlayer {
     }
 
     private func trackEnded() {
+        playbackLog.info("ended \(self.current?.id ?? "-", privacy: .public) at \(self.currentTime) of \(self.duration)")
         commitListening()
         if sleepAtEndOfTrack { sleepAtEndOfTrack = false; pause(); seek(to: 0); return }
         if repeatMode == .one { seek(to: 0); player.playImmediately(atRate: rate); return }

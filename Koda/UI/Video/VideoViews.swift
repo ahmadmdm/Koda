@@ -157,6 +157,7 @@ struct VideoSearchView: View {
     @State private var query = ""
     @State private var submitted = ""
     @State private var filter: VideoSearchFilter = .all
+    @FocusState private var searchFocused: Bool
     @State private var sort: VideoSort = .relevance
     @State private var results: [VideoSearchResult] = []
     @State private var continuation: String?
@@ -221,6 +222,15 @@ struct VideoSearchView: View {
         .readableContentWidth()
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Search YouTube")
+        .searchFocused($searchFocused)
+        .scrollDismissesKeyboard(.immediately)
+        // Opening Search with nothing searched yet goes straight to typing.
+        .task {
+            // After the search field is in the bar; focusing earlier is ignored.
+            guard submitted.isEmpty, query.isEmpty else { return }
+            try? await Task.sleep(for: .milliseconds(350))
+            searchFocused = true
+        }
         .onSubmit(of: .search) { submit(query) }
         .onChange(of: query) { _, new in
             if new.isEmpty { submitted = ""; results = [] }
@@ -236,6 +246,7 @@ struct VideoSearchView: View {
     }
 
     private func submit(_ raw: String) {
+        searchFocused = false
         let q = raw.decodingHTMLEntities
         query = q; submitted = q; suggestions = []
         library.addSearch(q, mode: .video)

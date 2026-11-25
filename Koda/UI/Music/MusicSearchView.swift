@@ -7,6 +7,7 @@ struct MusicSearchView: View {
     @Environment(AppState.self) private var app
     @State private var query = ""
     @State private var submitted = ""
+    @FocusState private var searchFocused: Bool
     @State private var filter: MusicSearchFilter = .songs
     @State private var results: [MusicCard] = []
     @State private var continuation: String?
@@ -63,7 +64,15 @@ struct MusicSearchView: View {
         .readableContentWidth()
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Songs, artists, albums")
-        .searchToolbarBehavior(.minimize)
+        .searchFocused($searchFocused)
+        .scrollDismissesKeyboard(.immediately)
+        // Opening Search with nothing searched yet goes straight to typing.
+        .task {
+            // After the search field is in the bar; focusing earlier is ignored.
+            guard submitted.isEmpty, query.isEmpty else { return }
+            try? await Task.sleep(for: .milliseconds(350))
+            searchFocused = true
+        }
         .onSubmit(of: .search) { submit(query) }
         .onChange(of: query) { _, new in
             if new.isEmpty { submitted = ""; results = [] }
@@ -112,6 +121,7 @@ struct MusicSearchView: View {
     }
 
     private func submit(_ q: String) {
+        searchFocused = false
         query = q
         submitted = q
         suggestions = []
