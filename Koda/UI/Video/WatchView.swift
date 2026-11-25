@@ -316,6 +316,9 @@ struct WatchView: View {
                             Button { library.toggleWatchLater(video) } label: {
                                 Label("Save", systemImage: library.isInWatchLater(video.id) ? "bookmark.fill" : "bookmark")
                             }
+                            if !video.isLive && d?.liveChat?.isReplay != false {
+                                VideoDownloadButton(video: d.map { var v = video; v.title = $0.title; v.channel = $0.channel.name; v.channelId = $0.channel.id; return v } ?? video)
+                            }
                             if let chat = d?.liveChat {
                                 Button { showChat.toggle() } label: {
                                     Label(chat.isReplay ? "Chat replay" : "Live chat", systemImage: showChat ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")

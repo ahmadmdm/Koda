@@ -4,9 +4,14 @@ struct VideoCard: View {
     var video: Video
     var compact = false
     var queue: [Video] = []
+    /// Replaces the views and date line in the compact layout (the downloads list shows quality and size).
+    var caption: String? = nil
     @Environment(VideoPlayerModel.self) private var player
     @Environment(LibraryStore.self) private var library
     @Environment(AppState.self) private var app
+    @State private var choosingDownload = false
+
+    private var downloads: VideoDownloadManager { .shared }
 
     var body: some View {
         Button { player.open(video, queue: queue) } label: {
@@ -16,7 +21,7 @@ struct VideoCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(video.title).font(.subheadline.weight(.medium)).lineLimit(2)
                         Text(video.channel).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        Text(video.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(caption ?? video.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer(minLength: 0)
                 }
@@ -39,6 +44,7 @@ struct VideoCard: View {
         }
         .buttonStyle(.plain)
         .contextMenu { menu }
+        .sheet(isPresented: $choosingDownload) { VideoDownloadSheet(video: video) }
     }
 
     private var thumbnail: some View {
@@ -50,6 +56,14 @@ struct VideoCard: View {
                 } else if let d = video.durationText {
                     Text(d).font(.caption2.weight(.semibold).monospacedDigit()).padding(.horizontal, 6).padding(.vertical, 2)
                         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.white).padding(6)
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                if downloads.isDownloaded(video.id) {
+                    Image(systemName: "arrow.down.circle.fill").font(.caption2.weight(.bold))
+                        .padding(.horizontal, 5).padding(.vertical, 3)
+                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.white).padding(6)
+                        .accessibilityLabel("Downloaded")
                 }
             }
             .overlay(alignment: .bottom) {
@@ -68,6 +82,13 @@ struct VideoCard: View {
         Button(library.isInWatchLater(video.id) ? "Remove from Watch Later" : "Watch Later", systemImage: "clock") { library.toggleWatchLater(video) }
         Button("Play as Audio", systemImage: "headphones") { MusicPlayer.shared.play([video.asSong], radio: true) }
         Button("Add Audio to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { MusicPlayer.shared.addToQueue([video.asSong]) }
+        if downloads.isDownloaded(video.id) {
+            Button("Remove Download", systemImage: "trash") { downloads.delete(video.id) }
+        } else if downloads.isInProgress(video.id) {
+            Button("Cancel Download", systemImage: "xmark.circle") { downloads.cancel(video.id) }
+        } else if !video.isLive {
+            Button("Download…", systemImage: "arrow.down.circle") { choosingDownload = true }
+        }
         if let channelId = video.channelId {
             Button("Go to Channel", systemImage: "person.crop.square") { app.navigate(.channel(channelId)) }
         }
@@ -539,6 +560,7 @@ struct VideoLibraryView: View {
                 link(.videoHistory, "History", "clock.fill", .orange, library.data.videoHistory.count)
                 link(.watchLater, "Watch Later", "clock.badge.checkmark.fill", .blue, library.data.watchLater.count)
                 link(.likedVideos, "Liked videos", "hand.thumbsup.fill", .pink, library.data.likedVideos.count)
+                link(.videoDownloads, "Downloads", "arrow.down.circle.fill", .indigo, VideoDownloadManager.shared.items.count)
                 link(.subscriptionsManage, "Subscriptions", "person.2.fill", .green, library.data.subscriptions.count)
                 link(.hidden, "Hidden & blocked", "eye.slash.fill", .gray, library.data.hiddenChannels.count + library.data.hiddenVideos.count)
             }

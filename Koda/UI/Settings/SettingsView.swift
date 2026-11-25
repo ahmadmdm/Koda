@@ -118,7 +118,7 @@ struct SettingsView: View {
             }
             if matches(.storage) {
                 Section("Storage") {
-                    LabeledContent("Downloads", value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file))
+                    LabeledContent("Downloads", value: ByteCountFormatter.string(fromByteCount: downloads.totalBytes + VideoDownloadManager.shared.totalBytes, countStyle: .file))
                     NavigationLink(value: Route.downloads) { Text("Manage downloads") }
                     Button("Clear listening & watch history", role: .destructive) { confirmClear = true }
                 }

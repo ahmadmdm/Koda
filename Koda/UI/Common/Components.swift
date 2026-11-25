@@ -4,7 +4,7 @@ enum Route: Hashable {
     case album(String), playlist(String), artist(String), localPlaylist(UUID)
     case channel(String), videoPlaylist(String, String)
     case liked, history, stats, downloads, recap, savedCollections, followedArtists
-    case videoHistory, watchLater, likedVideos, subscriptionsManage, hidden, accountHistory
+    case videoHistory, watchLater, likedVideos, subscriptionsManage, hidden, accountHistory, videoDownloads
 }
 
 extension View {
@@ -29,6 +29,7 @@ extension View {
             case .subscriptionsManage: ManageSubscriptionsView()
             case .hidden: HiddenItemsView()
             case .accountHistory: AccountHistoryView()
+            case .videoDownloads: VideoDownloadsView()
             }
         }
     }
