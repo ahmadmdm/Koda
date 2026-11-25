@@ -258,7 +258,7 @@ final class MusicPlayer {
         duration = Double(song.duration ?? 0)
         player.pause()
         updateNowPlaying()
-        loadTask = Task {
+        loadTask = Task { [self] in
             do {
                 let (url, loudness) = try await streamURL(for: song)
                 guard !Task.isCancelled, self.current?.id == song.id else { return }

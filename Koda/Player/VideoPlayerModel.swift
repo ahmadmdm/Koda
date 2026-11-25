@@ -222,8 +222,11 @@ final class VideoPlayerModel {
         for option in group.options {
             // The HLS NAME ("العربية - dubbed", "American English - original") is the option's title metadata;
             // displayName is only the localized language.
-            let title = AVMetadataItem.metadataItems(from: option.commonMetadata, filteredByIdentifier: .commonIdentifierTitle)
-                .first?.stringValue ?? ""
+            var title = ""
+            if let item = AVMetadataItem.metadataItems(from: option.commonMetadata, filteredByIdentifier: .commonIdentifierTitle).first,
+               let value = try? await item.load(.stringValue) {
+                title = value
+            }
             let tag = option.extendedLanguageTag ?? option.locale?.identifier
             let lowerTitle = title.lowercased()
             let isOriginal = lowerTitle.contains("original")

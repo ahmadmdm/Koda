@@ -15,6 +15,7 @@ struct KodaApp: App {
     init() {
         Scrobbler.shared.start()
         Task { await LocalMusicLibrary.shared.rescan() }
+        Diagnostics.shared.start()
     }
 
     var body: some Scene {

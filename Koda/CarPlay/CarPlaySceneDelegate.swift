@@ -70,7 +70,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         // Speed dial: the most played songs, as a grid of artwork.
         let top = library.topSongs(limit: 8).map(\.song)
         if top.count >= 4 {
-            let grid = CPListImageRowItem(text: String(localized: "Speed dial"), images: top.map { _ in placeholderImage() })
+            let grid = CPListImageRowItem(text: String(localized: "Speed dial"),
+                                          gridElements: top.map { _ in CPListImageRowItemGridElement(image: placeholderImage()) },
+                                          allowsMultipleLines: false)
             grid.listImageRowHandler = { [weak self] _, index, completion in
                 self?.play(top, at: index); completion()
             }
@@ -79,7 +81,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             Task { [weak grid] in
                 var images: [UIImage] = []
                 for s in top { images.append(await Self.image(s.artwork) ?? placeholderImage()) }
-                grid?.update(images)
+                grid?.elements = images.map { CPListImageRowItemGridElement(image: $0) }
             }
         }
         if let seed = library.recentSongs.first ?? library.data.likedSongs.first?.song,

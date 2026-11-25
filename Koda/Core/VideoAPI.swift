@@ -74,6 +74,10 @@ nonisolated enum VideoAPI {
             else if let p = filter.params { body["params"] = p }
         }
         let root = try await api.web("search", body)
+        return parseSearch(root)
+    }
+
+    static func parseSearch(_ root: J) -> ([VideoSearchResult], String?) {
         var results: [VideoSearchResult] = []
         var seen = Set<String>()
         func add(_ r: VideoSearchResult) { if seen.insert(r.id).inserted { results.append(r) } }
@@ -117,6 +121,10 @@ nonisolated enum VideoAPI {
         guard let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&xhr=t&oe=utf-8&hl=\(api.language)&gl=\(api.region)&q=\(q)"),
               let (data, _) = try? await URLSession.shared.data(from: url) else { return [] }
+        return parseSuggestions(data)
+    }
+
+    static func parseSuggestions(_ data: Data) -> [String] {
         let root = J(data: data)
         return root[1].array.compactMap { $0[0].string?.decodingHTMLEntities }
     }
@@ -125,6 +133,10 @@ nonisolated enum VideoAPI {
 
     static func watch(_ videoId: String) async throws -> WatchDetails {
         let root = try await api.web("next", ["videoId": videoId])
+        return parseWatch(root, videoId: videoId)
+    }
+
+    static func parseWatch(_ root: J, videoId: String) -> WatchDetails {
         let primary = root.first("videoPrimaryInfoRenderer")
         let secondary = root.first("videoSecondaryInfoRenderer")
         let owner = secondary.path("owner.videoOwnerRenderer")
@@ -163,6 +175,16 @@ nonisolated enum VideoAPI {
     /// Shorts comments page through `browse` rather than `next`.
     static func comments(token: String, endpoint: String = "next") async throws -> ([Comment], String?) {
         let root = try await api.web(endpoint, ["continuation": token])
+        let (comments, tokens) = parseComments(root)
+        if comments.isEmpty, let first = tokens.first, first != token {
+            return try await self.comments(token: first, endpoint: endpoint)
+        }
+        return (comments, tokens.last)
+    }
+
+    /// The comments on a page, and its continuation tokens in document order.
+    /// The first page carries a sort header and the real list token; later pages the next-page token.
+    static func parseComments(_ root: J) -> ([Comment], [String]) {
         let mutations = root.findAll("commentEntityPayload")
         let toolbars = Dictionary(root.findAll("engagementToolbarStateEntityPayload").compactMap { t -> (String, J)? in
             guard let key = t["key"].string else { return nil }; return (key, t)
@@ -178,18 +200,18 @@ nonisolated enum VideoAPI {
                            likes: c.path("toolbar.likeCountNotliked").string ?? toolbars[p["toolbarStateKey"].string ?? ""]?["likeCount"].string,
                            replyCount: c.path("toolbar.replyCount").string)
         }
-        // The first page carries a sort header and the real list token; later pages the next-page token.
         let tokens = root.findAll("continuationCommand").compactMap { $0["token"].string }
-        if comments.isEmpty, let first = tokens.first, first != token {
-            return try await self.comments(token: first, endpoint: endpoint)
-        }
-        return (comments, tokens.last)
+        return (comments, tokens)
     }
 
     // MARK: Channel
 
     static func channel(_ channelId: String) async throws -> ChannelPage {
         let root = try await api.web("browse", ["browseId": channelId, "params": "EgZ2aWRlb3PyBgQKAjoA"])
+        return parseChannel(root, channelId: channelId)
+    }
+
+    static func parseChannel(_ root: J, channelId: String) -> ChannelPage {
         let header = root.first("pageHeaderViewModel")
         let name = header["title"].text ?? root.path("metadata.channelMetadataRenderer.title").string ?? ""
         let rows = header.findAll("metadataRows").first?.array ?? []

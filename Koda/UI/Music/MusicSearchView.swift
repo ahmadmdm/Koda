@@ -192,7 +192,17 @@ final class VoiceSearch {
     /// The tap runs on the audio render thread, so it is built outside the main actor.
     nonisolated private static func installTap(on input: AVAudioInputNode, format: AVAudioFormat, request: SFSpeechAudioBufferRecognitionRequest) {
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in request.append(buffer) }
+        let sink = BufferSink(request: request)
+        input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable buffer, _ in sink.append(buffer) }
+    }
+
+    /// Hands tap buffers to the recognition request from the audio thread. Speech documents
+    /// `append(_:)` as callable from any thread; the request is not marked Sendable, so the
+    /// guarantee is stated here once instead of importing the whole module as `@preconcurrency`.
+    nonisolated private final class BufferSink: @unchecked Sendable {
+        private let request: SFSpeechAudioBufferRecognitionRequest
+        init(request: SFSpeechAudioBufferRecognitionRequest) { self.request = request }
+        func append(_ buffer: AVAudioPCMBuffer) { request.append(buffer) }
     }
 
     func stop() {
