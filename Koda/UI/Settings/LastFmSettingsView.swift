@@ -21,7 +21,8 @@ struct LastFmSection: View {
                 Button("Sign out of Last.fm", role: .destructive) { scrobbler.signOut() }
             } else {
                 TextField("API key", text: $apiKey)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled().font(.body.monospaced())
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .font(apiKey.isEmpty ? .body : .body.monospaced()) // a monospaced placeholder spreads Arabic letters apart
                 SecureField(scrobbler.hasSecret && secret.isEmpty ? "Shared secret (saved)" : "Shared secret", text: $secret)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                 TextField("Last.fm username", text: $username)

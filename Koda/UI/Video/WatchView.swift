@@ -168,6 +168,9 @@ struct WatchView: View {
             if let token = model.details?.commentsToken { CommentsView(token: token, count: model.details?.commentCount) }
         }
         .sheet(isPresented: $showDescription) { descriptionSheet }
+        .sheet(isPresented: Binding(get: { PictureAdjustState.shared.isPresented }, set: { PictureAdjustState.shared.isPresented = $0 })) {
+            PictureAdjustSheet()
+        }
         .onChange(of: model.current?.id) { sidePanel = .related }
     }
 
@@ -180,20 +183,31 @@ struct WatchView: View {
 
     private var topBar: some View {
         @Bindable var model = model
-        return HStack {
+        // Six round buttons: explicit tight spacing so the bar fits an iPhone's width.
+        return HStack(spacing: sizeClass == .regular ? 8 : 4) {
             Button { model.isPresented = false } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 40, height: 40) }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
             Spacer()
             TrackMenus()
-            PictureMenu()
+            if sizeClass == .regular { PictureMenu() }
             Menu {
                 Picker("Quality", selection: $model.quality) { ForEach(VideoQualityCap.allCases) { Text($0.title).tag($0) } }
-            } label: { Label(model.quality.title, systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize() }
+                if sizeClass != .regular { PictureMenu(submenu: true) }
+            } label: {
+                // iPad shows the quality name; iPhone an icon, with Picture inside this menu.
+                if sizeClass == .regular {
+                    Label(model.quality.title, systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize()
+                } else {
+                    Image(systemName: "slider.horizontal.3").font(.headline).frame(width: 40, height: 40)
+                }
+            }
             .buttonStyle(.glass)
+            .buttonBorderShape(sizeClass == .regular ? .capsule : .circle)
+            .accessibilityLabel(Text("Quality"))
             Button { model.close() } label: { Image(systemName: "xmark").font(.headline).frame(width: 40, height: 40) }
                 .buttonStyle(.glass).buttonBorderShape(.circle)
         }
-        .padding(.horizontal).padding(.bottom, 8)
+        .padding(.horizontal, sizeClass == .regular ? 16 : 10).padding(.bottom, 8)
     }
 
     private var videoSurface: some View {

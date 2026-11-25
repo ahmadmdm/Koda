@@ -84,44 +84,75 @@ extension View {
     func pictureFilter() -> some View { modifier(PictureFilterModifier()) }
 }
 
+/// Whether the Picture sliders sheet is up. Shared so the menu can live inside another menu
+/// (iPhone) while the sheet hangs off the watch page.
+@MainActor
+@Observable
+final class PictureAdjustState {
+    static let shared = PictureAdjustState()
+    var isPresented = false
+}
+
 /// The Picture menu on the watch page: presets, then a sheet with brightness, contrast and saturation.
+/// As a round button on iPad; as a submenu of the quality menu on iPhone, where the bar has no room.
 struct PictureMenu: View {
+    var submenu = false
     @AppStorage("picturePreset") private var presetRaw = PicturePreset.off.rawValue
     @AppStorage("pictureBrightness") private var brightness: Double = 0
     @AppStorage("pictureContrast") private var contrast: Double = 1
     @AppStorage("pictureSaturation") private var saturation: Double = 1
-    @State private var showAdjust = false
 
     private var isCustomized: Bool {
         presetRaw != PicturePreset.off.rawValue || brightness != 0 || contrast != 1 || saturation != 1
     }
 
     var body: some View {
+        if submenu {
+            menu.labelStyle(.titleAndIcon)
+        } else {
+            menu.buttonStyle(.glass).buttonBorderShape(.circle)
+        }
+    }
+
+    private var menu: some View {
         Menu {
             Picker("Picture", selection: $presetRaw) {
                 ForEach(PicturePreset.allCases) { Label($0.title, systemImage: $0.icon).tag($0.rawValue) }
             }
             .pickerStyle(.inline)
             Section {
-                Button("Adjust…", systemImage: "slider.horizontal.below.square.filled.and.square") { showAdjust = true }
+                Button("Adjust…", systemImage: "slider.horizontal.below.square.filled.and.square") { PictureAdjustState.shared.isPresented = true }
                 if isCustomized {
-                    Button("Reset Picture", systemImage: "arrow.counterclockwise") { reset() }
+                    Button("Reset Picture", systemImage: "arrow.counterclockwise") {
+                        presetRaw = PicturePreset.off.rawValue
+                        brightness = 0; contrast = 1; saturation = 1
+                    }
                 }
             }
         } label: {
-            Image(systemName: "camera.filters").symbolVariant(isCustomized ? .fill : .none).frame(width: 40, height: 40)
+            if submenu {
+                Label("Picture", systemImage: "camera.filters")
+            } else {
+                Image(systemName: "camera.filters").symbolVariant(isCustomized ? .fill : .none).frame(width: 40, height: 40)
+            }
         }
-        .buttonStyle(.glass).buttonBorderShape(.circle)
-        .accessibilityLabel("Picture")
-        .sheet(isPresented: $showAdjust) { adjustSheet }
+        .accessibilityLabel(Text("Picture"))
+    }
+}
+
+/// Brightness, contrast and saturation on top of the chosen preset.
+struct PictureAdjustSheet: View {
+    @AppStorage("picturePreset") private var presetRaw = PicturePreset.off.rawValue
+    @AppStorage("pictureBrightness") private var brightness: Double = 0
+    @AppStorage("pictureContrast") private var contrast: Double = 1
+    @AppStorage("pictureSaturation") private var saturation: Double = 1
+    @Environment(\.dismiss) private var dismiss
+
+    private var isCustomized: Bool {
+        presetRaw != PicturePreset.off.rawValue || brightness != 0 || contrast != 1 || saturation != 1
     }
 
-    private func reset() {
-        presetRaw = PicturePreset.off.rawValue
-        brightness = 0; contrast = 1; saturation = 1
-    }
-
-    private var adjustSheet: some View {
+    var body: some View {
         NavigationStack {
             Form {
                 Section("Preset") {
@@ -135,13 +166,16 @@ struct PictureMenu: View {
                     slider("Saturation", value: $saturation, in: 0...2, neutral: 1, icon: "drop")
                 }
                 Section {
-                    Button("Reset Picture", systemImage: "arrow.counterclockwise", role: .destructive) { reset() }
-                        .disabled(!isCustomized)
+                    Button("Reset Picture", systemImage: "arrow.counterclockwise", role: .destructive) {
+                        presetRaw = PicturePreset.off.rawValue
+                        brightness = 0; contrast = 1; saturation = 1
+                    }
+                    .disabled(!isCustomized)
                 }
             }
             .navigationTitle("Picture")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showAdjust = false } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         .presentationDetents([.medium, .large])
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))

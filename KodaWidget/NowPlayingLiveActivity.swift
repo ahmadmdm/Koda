@@ -36,14 +36,14 @@ struct NowPlayingLiveActivity: Widget {
                         .padding(.top, 4)
                 }
             } compactLeading: {
-                LiveActivityArtwork(state: state, cornerRadius: 6)
+                LiveActivityArtwork(state: state, cornerRadius: 6, maxPixels: 72)
                     .frame(width: 24, height: 24)
             } compactTrailing: {
                 Image(systemName: state.isPlaying ? "waveform" : "pause.fill")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.white)
             } minimal: {
-                LiveActivityArtwork(state: state, cornerRadius: 12)
+                LiveActivityArtwork(state: state, cornerRadius: 12, maxPixels: 72)
                     .frame(width: 24, height: 24)
             }
             .widgetURL(URL(string: "koda://nowplaying"))
@@ -77,10 +77,14 @@ struct LiveActivityLockScreen: View {
 struct LiveActivityArtwork: View {
     var state: NowPlayingActivityAttributes.ContentState
     var cornerRadius: CGFloat
+    /// Largest side in pixels. The Dynamic Island draws a blank placeholder for images over its
+    /// small memory budget, so compact and minimal pass a tiny size.
+    var maxPixels: CGFloat = 200
 
     var body: some View {
         Group {
-            if state.hasArtwork, let url = NowPlayingSnapshot.artworkURL, let image = UIImage(contentsOfFile: url.path) {
+            if state.hasArtwork, let url = NowPlayingSnapshot.artworkURL, let image = UIImage(contentsOfFile: url.path)?
+                .preparingThumbnail(of: CGSize(width: maxPixels, height: maxPixels)) {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
                 ZStack {

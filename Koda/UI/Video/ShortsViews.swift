@@ -426,7 +426,8 @@ struct ShortsShelf: View {
 
     var body: some View {
         let visible = items.filter { !library.data.hiddenVideos.contains($0.id) }
-        Group {
+        // A VStack, not a Group: an empty Group is no view at all, so its .task would never run.
+        VStack(alignment: .leading, spacing: 0) {
             if !visible.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("Shorts", systemImage: "play.rectangle.on.rectangle.fill").font(.title3.bold()).padding(.horizontal)
