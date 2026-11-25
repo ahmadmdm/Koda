@@ -156,11 +156,13 @@ nonisolated enum VideoAPI {
             date: primary["dateText"].text ?? "",
             description: secondary["attributedDescription"].text ?? secondary["description"].text ?? "",
             channel: channel, likes: likes, related: related,
-            commentsToken: commentsToken, commentCount: commentCount)
+            commentsToken: commentsToken, commentCount: commentCount,
+            liveChat: LiveChatSource.parse(watchNext: root))
     }
 
-    static func comments(token: String) async throws -> ([Comment], String?) {
-        let root = try await api.web("next", ["continuation": token])
+    /// Shorts comments page through `browse` rather than `next`.
+    static func comments(token: String, endpoint: String = "next") async throws -> ([Comment], String?) {
+        let root = try await api.web(endpoint, ["continuation": token])
         let mutations = root.findAll("commentEntityPayload")
         let toolbars = Dictionary(root.findAll("engagementToolbarStateEntityPayload").compactMap { t -> (String, J)? in
             guard let key = t["key"].string else { return nil }; return (key, t)
@@ -179,7 +181,7 @@ nonisolated enum VideoAPI {
         // The first page carries a sort header and the real list token; later pages the next-page token.
         let tokens = root.findAll("continuationCommand").compactMap { $0["token"].string }
         if comments.isEmpty, let first = tokens.first, first != token {
-            return try await self.comments(token: first)
+            return try await self.comments(token: first, endpoint: endpoint)
         }
         return (comments, tokens.last)
     }

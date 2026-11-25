@@ -63,6 +63,7 @@ struct RootView: View {
         .fullScreenCover(isPresented: $video.isPresented) {
             WatchView()
         }
+        .fullScreenCover(item: $app.shorts) { ShortsPagerView(launch: $0) }
         .sheet(isPresented: Binding(get: { app.addToPlaylist != nil }, set: { if !$0 { app.addToPlaylist = nil } })) {
             AddToPlaylistSheet(songs: app.addToPlaylist ?? [])
         }

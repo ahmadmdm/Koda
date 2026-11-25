@@ -13,6 +13,7 @@ final class AppState {
     var paths: [AppTab: NavigationPath] = [.home: NavigationPath(), .library: NavigationPath(), .subscriptions: NavigationPath(), .settings: NavigationPath(), .search: NavigationPath()]
     var showPlayer = false
     var addToPlaylist: [Song]?
+    var shorts: ShortsLaunch?
     var toast: String?
 
     func path(_ tab: AppTab) -> Binding<NavigationPath> {
@@ -44,6 +45,12 @@ final class AppState {
         var parts = url.pathComponents.filter { $0 != "/" }
         if url.scheme == "koda", let first = host.isEmpty ? nil : host { parts.insert(first, at: 0) }
         let isMusic = host.contains("music.youtube.com")
+        if parts.first == "shorts", !isMusic, let id = parts.dropFirst().first {
+            showPlayer = false
+            VideoPlayerModel.shared.isPresented = false
+            shorts = ShortsLaunch(items: [ShortItem(id: id)])
+            return
+        }
         if let v = query["v"] ?? (host.contains("youtu.be") ? parts.first : nil) ?? (parts.first == "shorts" || parts.first == "live" ? parts.dropFirst().first : nil) {
             if isMusic || mode == .music {
                 Task {
