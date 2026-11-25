@@ -1,0 +1,543 @@
+import SwiftUI
+
+struct VideoCard: View {
+    var video: Video
+    var compact = false
+    var queue: [Video] = []
+    @Environment(VideoPlayerModel.self) private var player
+    @Environment(LibraryStore.self) private var library
+    @Environment(AppState.self) private var app
+
+    var body: some View {
+        Button { player.open(video, queue: queue) } label: {
+            if compact {
+                HStack(alignment: .top, spacing: 12) {
+                    thumbnail.frame(width: 168, height: 94)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(video.title).font(.subheadline.weight(.medium)).lineLimit(2)
+                        Text(video.channel).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(video.metaLine).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    thumbnail.aspectRatio(16 / 9, contentMode: .fit)
+                    HStack(alignment: .top, spacing: 10) {
+                        if let avatar = video.channelAvatar {
+                            Artwork(url: URL(string: avatar), cornerRadius: 18, placeholderIcon: "person.fill").frame(width: 36, height: 36)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(video.title).font(.body.weight(.medium)).lineLimit(2)
+                            Text([video.channel, video.metaLine].filter { !$0.isEmpty }.joined(separator: " • "))
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .contextMenu { menu }
+    }
+
+    private var thumbnail: some View {
+        Artwork(url: video.thumbnailURL, cornerRadius: compact ? 10 : 16, placeholderIcon: "play.rectangle")
+            .overlay(alignment: .bottomTrailing) {
+                if video.isLive {
+                    Text("LIVE").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(.red, in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.white).padding(6)
+                } else if let d = video.durationText {
+                    Text(d).font(.caption2.weight(.semibold).monospacedDigit()).padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.white).padding(6)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let entry = library.data.videoHistory.first(where: { $0.video.id == video.id }), entry.position > 0,
+                   let total = video.durationText?.durationSeconds, total > 0 {
+                    GeometryReader { g in
+                        Rectangle().fill(.red).frame(width: g.size.width * min(entry.position / Double(total), 1), height: 3)
+                    }
+                    .frame(height: 3)
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: compact ? 10 : 16, bottomTrailingRadius: compact ? 10 : 16))
+                }
+            }
+    }
+
+    @ViewBuilder private var menu: some View {
+        Button(library.isInWatchLater(video.id) ? "Remove from Watch Later" : "Watch Later", systemImage: "clock") { library.toggleWatchLater(video) }
+        Button("Play as Audio", systemImage: "headphones") { MusicPlayer.shared.play([video.asSong], radio: true) }
+        Button("Add Audio to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { MusicPlayer.shared.addToQueue([video.asSong]) }
+        if let channelId = video.channelId {
+            Button("Go to Channel", systemImage: "person.crop.square") { app.navigate(.channel(channelId)) }
+        }
+        ShareLink(item: URL(string: "https://youtu.be/\(video.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
+        Divider()
+        Button("Not Interested", systemImage: "eye.slash") { library.data.hiddenVideos.append(video.id); app.showToast("Hidden") }
+        if let channelId = video.channelId {
+            Button("Block Channel", systemImage: "hand.raised", role: .destructive) {
+                library.hideChannel(ChannelSummary(id: channelId, name: video.channel, avatar: video.channelAvatar))
+                app.showToast("Blocked \(video.channel)")
+            }
+        }
+    }
+}
+
+struct VideoHomeView: View {
+    @Environment(LibraryStore.self) private var library
+    @Environment(AccountModel.self) private var account
+    @State private var topic = VideoTopic.all[0]
+    @State private var videos: [Video] = []
+    @State private var loading = false
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 22) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) {
+                            ForEach(VideoTopic.all) { t in
+                                Button { topic = t } label: { Label(t.title, systemImage: t.icon).font(.subheadline.weight(.medium)) }
+                                    .buttonStyle(topic == t ? AnyPrimitiveButtonStyle(.glassProminent) : AnyPrimitiveButtonStyle(.glass))
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                let continueWatching = library.data.videoHistory.filter { $0.position > 30 }.prefix(10)
+                if topic == VideoTopic.all[0], !continueWatching.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Continue watching").font(.title3.bold()).padding(.horizontal)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack(spacing: 14) {
+                                ForEach(continueWatching) { e in VideoCard(video: e.video).frame(width: 260) }
+                            }.padding(.horizontal)
+                        }
+                    }
+                }
+                if loading && videos.isEmpty { LoadingView() }
+                if let error, videos.isEmpty { ErrorView(message: error) { Task { await load() } } }
+                let visible = library.filtered(videos)
+                ForEach(visible) { v in VideoCard(video: v, queue: visible).padding(.horizontal) }
+            }
+            .padding(.bottom, 24)
+        }
+        .navigationTitle("Home")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
+        .refreshable { await load() }
+        .task(id: "\(topic.id)|\(account.active?.id.uuidString ?? "")") { await load() }
+    }
+
+    private func load() async {
+        loading = true; defer { loading = false }
+        do {
+            if topic == VideoTopic.all[0], AccountAPI.isSignedIn, let home = try? await AccountAPI.videoHome(), !home.isEmpty {
+                videos = home
+            } else {
+                videos = try await VideoAPI.feed(topic: topic, seeds: library.data.videoHistory.prefix(3).map(\.video.id))
+            }
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+}
+
+struct AnyPrimitiveButtonStyle: PrimitiveButtonStyle {
+    private let make: (Configuration) -> AnyView
+    init<S: PrimitiveButtonStyle>(_ style: S) {
+        make = { config in AnyView(Button(role: config.role, action: config.trigger) { config.label }.buttonStyle(style)) }
+    }
+    func makeBody(configuration: Configuration) -> some View { make(configuration) }
+}
+
+struct VideoSearchView: View {
+    @Environment(LibraryStore.self) private var library
+    @State private var query = ""
+    @State private var submitted = ""
+    @State private var filter: VideoSearchFilter = .all
+    @State private var sort: VideoSort = .relevance
+    @State private var results: [VideoSearchResult] = []
+    @State private var continuation: String?
+    @State private var suggestions: [String] = []
+    @State private var loading = false
+    @State private var error: String?
+
+    var body: some View {
+        List {
+            if submitted.isEmpty {
+                let items = suggestions.isEmpty ? library.data.videoSearches : suggestions
+                ForEach(items, id: \.self) { s in
+                    Button { submit(s) } label: {
+                        Label(s, systemImage: suggestions.isEmpty ? "clock.arrow.circlepath" : "magnifyingglass").foregroundStyle(.primary)
+                    }
+                }
+                .onDelete { if suggestions.isEmpty { library.data.videoSearches.remove(atOffsets: $0) } }
+                if items.isEmpty {
+                    ContentUnavailableView("Search YouTube", systemImage: "play.rectangle.on.rectangle", description: Text("Videos, channels and playlists."))
+                        .listRowBackground(Color.clear)
+                }
+            } else {
+                HStack {
+                    Picker("Filter", selection: $filter) { ForEach(VideoSearchFilter.allCases) { Text($0.title).tag($0) } }.pickerStyle(.segmented)
+                    if filter == .videos {
+                        Menu { Picker("Sort", selection: $sort) { ForEach(VideoSort.allCases) { Text($0.title).tag($0) } } } label: {
+                            Image(systemName: "line.3.horizontal.decrease.circle").font(.title3)
+                        }
+                    }
+                }
+                .listRowBackground(Color.clear)
+                if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear) }
+                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } } }
+                let videos = results.compactMap { if case .video(let v) = $0 { v } else { nil } }
+                ForEach(results) { r in
+                    switch r {
+                    case .video(let v): if !library.isHidden(v) { VideoCard(video: v, compact: true, queue: videos) }
+                    case .channel(let c):
+                        NavigationLink(value: Route.channel(c.id)) {
+                            HStack(spacing: 14) {
+                                Artwork(url: c.avatar.flatMap(URL.init(string:)), cornerRadius: 34, placeholderIcon: "person.fill").frame(width: 68, height: 68)
+                                VStack(alignment: .leading) { Text(c.name).font(.headline); Text(c.subscribers ?? "").font(.caption).foregroundStyle(.secondary) }
+                            }
+                        }
+                    case .playlist(let p):
+                        NavigationLink(value: Route.videoPlaylist(p.id, p.title)) {
+                            HStack(alignment: .top, spacing: 12) {
+                                Artwork(url: p.thumbnail.flatMap(URL.init(string:)), cornerRadius: 10, placeholderIcon: "list.bullet.rectangle")
+                                    .frame(width: 168, height: 94)
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if let c = p.count { Text(c).font(.caption2.bold()).padding(4).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 4)).foregroundStyle(.white).padding(4) }
+                                    }
+                                VStack(alignment: .leading) { Text(p.title).font(.subheadline.weight(.medium)).lineLimit(2); Text(p.channel).font(.caption).foregroundStyle(.secondary) }
+                            }
+                        }
+                    }
+                }
+                if continuation != nil { ProgressView().frame(maxWidth: .infinity).task { await loadMore() } }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("Search")
+        .searchable(text: $query, prompt: "Search YouTube")
+        .onSubmit(of: .search) { submit(query) }
+        .onChange(of: query) { _, new in
+            if new.isEmpty { submitted = ""; results = [] }
+            Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard new == query, !new.isEmpty, new != submitted else { suggestions = []; return }
+                suggestions = await VideoAPI.suggestions(new)
+            }
+        }
+        .onChange(of: filter) { Task { await search() } }
+        .onChange(of: sort) { Task { await search() } }
+        .toolbar { ToolbarItem(placement: .topBarLeading) { ModeSwitcher() } }
+    }
+
+    private func submit(_ raw: String) {
+        let q = raw.decodingHTMLEntities
+        query = q; submitted = q; suggestions = []
+        library.addSearch(q, mode: .video)
+        Task { await search() }
+    }
+
+    private func search() async {
+        guard !submitted.isEmpty else { return }
+        loading = true; error = nil; defer { loading = false }
+        do { (results, continuation) = try await VideoAPI.search(submitted, filter: filter, sort: sort) }
+        catch { self.error = error.localizedDescription; results = [] }
+    }
+
+    private func loadMore() async {
+        guard let token = continuation else { return }
+        if let (more, next) = try? await VideoAPI.search(submitted, filter: filter, continuation: token) {
+            let ids = Set(results.map(\.id))
+            results += more.filter { !ids.contains($0.id) }
+            continuation = more.isEmpty ? nil : next
+        } else { continuation = nil }
+    }
+}
+
+struct ChannelView: View {
+    var channelId: String
+    @Environment(LibraryStore.self) private var library
+    @State private var page: ChannelPage?
+    @State private var error: String?
+    @State private var filter = ""
+    @State private var sortNewest = true
+
+    var body: some View {
+        Group {
+            if let page { content(page) }
+            else if let error { ErrorView(message: error) { Task { await load() } } }
+            else { LoadingView() }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .task { if page == nil { await load() } }
+    }
+
+    private func load() async {
+        do { page = try await VideoAPI.channel(channelId); error = nil } catch { self.error = error.localizedDescription }
+    }
+
+    private func content(_ page: ChannelPage) -> some View {
+        let summary = ChannelSummary(id: page.id, name: page.name, avatar: page.avatar, subscribers: page.subscribers)
+        let videos = page.videos.filter { filter.isEmpty || $0.title.localizedCaseInsensitiveContains(filter) }
+        let ordered = sortNewest ? videos : videos.reversed()
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let banner = page.banner {
+                    Artwork(url: URL(string: banner), cornerRadius: 16).frame(height: 110).clipped().padding(.horizontal)
+                }
+                HStack(spacing: 14) {
+                    Artwork(url: page.avatar.flatMap(URL.init(string:)), cornerRadius: 40, placeholderIcon: "person.fill").frame(width: 80, height: 80)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(page.name).font(.title2.bold())
+                        Text([page.handle, page.subscribers].compactMap { $0 }.joined(separator: " • ")).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                if let d = page.description, !d.isEmpty { Text(d).font(.footnote).foregroundStyle(.secondary).lineLimit(3).padding(.horizontal) }
+                Button { library.toggleSubscription(summary) } label: {
+                    Label(library.isSubscribed(page.id) ? "Subscribed" : "Subscribe", systemImage: library.isSubscribed(page.id) ? "bell.fill" : "bell")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(library.isSubscribed(page.id) ? AnyPrimitiveButtonStyle(.glass) : AnyPrimitiveButtonStyle(.glassProminent))
+                .controlSize(.large).padding(.horizontal)
+                HStack {
+                    TextField("Search uploads", text: $filter).textFieldStyle(.roundedBorder)
+                    Button { sortNewest.toggle() } label: { Label(sortNewest ? "Newest" : "Oldest", systemImage: "arrow.up.arrow.down") }.buttonStyle(.glass)
+                }
+                .padding(.horizontal)
+                LazyVStack(spacing: 20) {
+                    ForEach(ordered) { VideoCard(video: $0, queue: Array(ordered)).padding(.horizontal) }
+                }
+            }
+            .padding(.vertical)
+        }
+    }
+}
+
+struct VideoPlaylistView: View {
+    var playlistId: String
+    var title: String
+    @State private var videos: [Video] = []
+    @State private var loadedTitle: String?
+    @State private var error: String?
+    @Environment(VideoPlayerModel.self) private var player
+
+    var body: some View {
+        List {
+            if !videos.isEmpty {
+                Button { player.open(videos[0], queue: Array(videos.dropFirst())) } label: { Label("Play all", systemImage: "play.fill").frame(maxWidth: .infinity) }
+                    .buttonStyle(.glassProminent).controlSize(.large).listRowBackground(Color.clear)
+            }
+            ForEach(videos) { VideoCard(video: $0, compact: true, queue: videos) }
+            if let error { ErrorView(message: error) { Task { await load() } } }
+        }
+        .listStyle(.plain)
+        .overlay { if videos.isEmpty && error == nil { LoadingView() } }
+        .navigationTitle(loadedTitle ?? title)
+        .task { if videos.isEmpty { await load() } }
+    }
+
+    private func load() async {
+        do { (loadedTitle, videos) = try await VideoAPI.playlist(playlistId) } catch { self.error = error.localizedDescription }
+    }
+}
+
+struct SubscriptionsView: View {
+    @Environment(LibraryStore.self) private var library
+    @Environment(AccountModel.self) private var account
+    @State private var feed: [Video] = []
+    @State private var loading = false
+    @State private var channelFilter: String?
+    @State private var maxAgeDays = 0
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                if !library.data.subscriptions.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 14) {
+                            ForEach(library.data.subscriptions) { c in
+                                Button { channelFilter = channelFilter == c.id ? nil : c.id } label: {
+                                    VStack {
+                                        Artwork(url: c.avatar.flatMap(URL.init(string:)), cornerRadius: 30, placeholderIcon: "person.fill").frame(width: 60, height: 60)
+                                            .overlay(Circle().stroke(Color.accentColor, lineWidth: channelFilter == c.id ? 3 : 0))
+                                        Text(c.name).font(.caption2).lineLimit(1).frame(width: 66)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                let cutoff = maxAgeDays > 0 ? Calendar.current.date(byAdding: .day, value: -maxAgeDays, to: .now) : nil
+                let visible = feed.filter { (channelFilter == nil || $0.channelId == channelFilter) && (cutoff == nil || ($0.publishedDate ?? .now) >= cutoff!) }
+                ForEach(visible) { VideoCard(video: $0, queue: visible).padding(.horizontal) }
+                if loading && feed.isEmpty { LoadingView() }
+            }
+            .padding(.vertical)
+        }
+        .overlay {
+            if library.data.subscriptions.isEmpty && !account.isSignedIn {
+                ContentUnavailableView("No subscriptions", systemImage: "rectangle.stack.badge.person.crop", description: Text("Subscribe to channels from their page. Follows stay on this iPhone."))
+            }
+        }
+        .navigationTitle("Subscriptions")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Picker("Uploaded", selection: $maxAgeDays) {
+                        Text("Any time").tag(0); Text("Today").tag(1); Text("This week").tag(7); Text("This month").tag(30)
+                    }
+                    NavigationLink(value: Route.subscriptionsManage) { Label("Manage", systemImage: "person.2") }
+                } label: { Image(systemName: "line.3.horizontal.decrease.circle") }
+            }
+        }
+        .refreshable { await load() }
+        .task(id: "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")") { await load() }
+    }
+
+    private func load() async {
+        loading = true; defer { loading = false }
+        let ids = library.data.subscriptions.map(\.id)
+        let avatars = Dictionary(library.data.subscriptions.map { ($0.id, $0.avatar) }, uniquingKeysWith: { a, _ in a })
+        var all: [Video] = []
+        await withTaskGroup(of: [Video].self) { group in
+            for id in ids { group.addTask { await VideoAPI.rssFeed(channelId: id) } }
+            if AccountAPI.isSignedIn { group.addTask { (try? await AccountAPI.subscriptionsFeed()) ?? [] } }
+            for await vids in group { all += vids }
+        }
+        var seen = Set<String>()
+        all = all.filter { seen.insert($0.id).inserted }
+        feed = library.filtered(all.map { var v = $0; v.channelAvatar = v.channelAvatar ?? v.channelId.flatMap { avatars[$0] ?? nil }; return v })
+
+        // The account feed arrives newest-first without dates and keeps YouTube's order; device-only
+        // follows from RSS carry dates and follow it, newest first.
+        feed = feed.filter { $0.publishedDate == nil }
+            + feed.filter { $0.publishedDate != nil }.sorted { $0.publishedDate! > $1.publishedDate! }
+    }
+}
+
+struct ManageSubscriptionsView: View {
+    @Environment(LibraryStore.self) private var library
+    var body: some View {
+        List {
+            ForEach(library.data.subscriptions) { c in
+                NavigationLink(value: Route.channel(c.id)) {
+                    HStack {
+                        Artwork(url: c.avatar.flatMap(URL.init(string:)), cornerRadius: 20, placeholderIcon: "person.fill").frame(width: 40, height: 40)
+                        Text(c.name)
+                    }
+                }
+            }
+            .onDelete { library.data.subscriptions.remove(atOffsets: $0) }
+        }
+        .navigationTitle("Subscriptions")
+        .toolbar { EditButton() }
+    }
+}
+
+struct HiddenItemsView: View {
+    @Environment(LibraryStore.self) private var library
+    var body: some View {
+        List {
+            Section("Blocked channels") {
+                ForEach(library.data.hiddenChannels) { Text($0.name) }.onDelete { library.data.hiddenChannels.remove(atOffsets: $0) }
+            }
+            Section("Hidden videos") {
+                Text("\(library.data.hiddenVideos.count) videos hidden")
+                if !library.data.hiddenVideos.isEmpty { Button("Unhide all") { library.data.hiddenVideos.removeAll() } }
+            }
+        }
+        .navigationTitle("Hidden")
+    }
+}
+
+enum VideoListKind { case history, watchLater, liked }
+
+struct VideoListView: View {
+    var kind: VideoListKind
+    @Environment(LibraryStore.self) private var library
+    var body: some View {
+        let entries: [VideoEntry] = switch kind {
+        case .history: library.data.videoHistory
+        case .watchLater: library.data.watchLater
+        case .liked: library.data.likedVideos
+        }
+        let videos = entries.map(\.video)
+        List {
+            ForEach(videos) { VideoCard(video: $0, compact: true, queue: videos) }
+                .onDelete { idx in
+                    switch kind {
+                    case .history: library.data.videoHistory.remove(atOffsets: idx)
+                    case .watchLater: library.data.watchLater.remove(atOffsets: idx)
+                    case .liked: library.data.likedVideos.remove(atOffsets: idx)
+                    }
+                }
+        }
+        .listStyle(.plain)
+        .overlay { if videos.isEmpty { ContentUnavailableView("Nothing here yet", systemImage: "play.rectangle") } }
+        .navigationTitle(kind == .history ? Text("History") : kind == .watchLater ? Text("Watch Later") : Text("Liked videos"))
+    }
+}
+
+struct VideoLibraryView: View {
+    @Environment(LibraryStore.self) private var library
+    @Environment(AccountModel.self) private var account
+    var body: some View {
+        List {
+            if account.isSignedIn {
+                Section {
+                    NavigationLink(value: Route.videoPlaylist("WL", String(localized: "Watch Later"))) { Label("Watch Later", systemImage: "clock.badge.checkmark") }
+                    NavigationLink(value: Route.videoPlaylist("LL", String(localized: "Liked videos"))) { Label("Liked videos", systemImage: "hand.thumbsup") }
+                    NavigationLink(value: Route.accountHistory) { Label("Watch history", systemImage: "clock.arrow.circlepath") }
+                } header: { Label(account.active?.name ?? "YouTube", systemImage: "person.crop.circle") }
+            }
+            Section {
+                link(.videoHistory, "History", "clock.fill", .orange, library.data.videoHistory.count)
+                link(.watchLater, "Watch Later", "clock.badge.checkmark.fill", .blue, library.data.watchLater.count)
+                link(.likedVideos, "Liked videos", "hand.thumbsup.fill", .pink, library.data.likedVideos.count)
+                link(.subscriptionsManage, "Subscriptions", "person.2.fill", .green, library.data.subscriptions.count)
+                link(.hidden, "Hidden & blocked", "eye.slash.fill", .gray, library.data.hiddenChannels.count + library.data.hiddenVideos.count)
+            }
+            if !library.data.videoHistory.isEmpty {
+                Section("Recently watched") {
+                    ForEach(library.data.videoHistory.prefix(10)) { VideoCard(video: $0.video, compact: true) }
+                }
+            }
+        }
+        .navigationTitle("Library")
+        .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
+    }
+
+    private func link(_ route: Route, _ title: LocalizedStringKey, _ icon: String, _ color: Color, _ count: Int) -> some View {
+        NavigationLink(value: route) {
+            HStack {
+                Label { Text(title) } icon: {
+                    Image(systemName: icon).foregroundStyle(.white).frame(width: 30, height: 30).background(color.gradient, in: RoundedRectangle(cornerRadius: 8))
+                }
+                Spacer()
+                Text("\(count)").foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+/// The account's YouTube watch history.
+struct AccountHistoryView: View {
+    @State private var videos: [Video] = []
+    @State private var loading = true
+    var body: some View {
+        List { ForEach(videos) { VideoCard(video: $0, compact: true, queue: videos) } }
+            .listStyle(.plain)
+            .overlay {
+                if loading { LoadingView() }
+                else if videos.isEmpty { ContentUnavailableView("Nothing here yet", systemImage: "clock") }
+            }
+            .navigationTitle("Watch history")
+            .task { videos = (try? await AccountAPI.watchHistory()) ?? []; loading = false }
+    }
+}

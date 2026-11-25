@@ -1,0 +1,146 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "%lld": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld"
+          }
+        }
+      }
+    },
+    "Koda": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كودا"
+          }
+        }
+      }
+    },
+    "Like Song": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإعجاب بالأغنية"
+          }
+        }
+      }
+    },
+    "Next Song": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الأغنية التالية"
+          }
+        }
+      }
+    },
+    "Nothing playing": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا شيء قيد التشغيل"
+          }
+        }
+      }
+    },
+    "Now Playing": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قيد التشغيل"
+          }
+        }
+      }
+    },
+    "Open Koda to start the music.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "افتح كودا لبدء الموسيقى."
+          }
+        }
+      }
+    },
+    "Play or Pause": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل أو إيقاف مؤقت"
+          }
+        }
+      }
+    },
+    "Plays or pauses Koda.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يشغّل كودا أو يوقفه مؤقتًا."
+          }
+        }
+      }
+    },
+    "Plays or pauses the current song in Koda.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يشغّل الأغنية الحالية في كودا أو يوقفها مؤقتًا."
+          }
+        }
+      }
+    },
+    "Previous Song": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الأغنية السابقة"
+          }
+        }
+      }
+    },
+    "The song playing in Koda, with controls and what comes next.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الأغنية قيد التشغيل في كودا، مع أزرار التحكم وما يليها."
+          }
+        }
+      }
+    },
+    "Up next": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التالي"
+          }
+        }
+      }
+    },
+    "♪ %@ — %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "♪ %@ — %@"
+          }
+        }
+      }
+    }
+  }
+}
