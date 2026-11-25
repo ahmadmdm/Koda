@@ -45,12 +45,12 @@ nonisolated struct LiveChatPage: Sendable {
 /// reads them (`LiveChat.kt`, `LiveChatParsers.kt`). Verified against a live stream and a
 /// finished one, November 2026. Reading chat needs no account.
 nonisolated enum LiveChatAPI {
-    static func live(_ continuation: String) async throws -> LiveChatPage {
+    @concurrent static func live(_ continuation: String) async throws -> LiveChatPage {
         parse(try await InnerTube.shared.web("live_chat/get_live_chat", ["continuation": continuation]))
     }
 
     /// One replay window (a few minutes of chat) starting near `offsetMs`.
-    static func replay(_ continuation: String, offsetMs: Int) async throws -> LiveChatPage {
+    @concurrent static func replay(_ continuation: String, offsetMs: Int) async throws -> LiveChatPage {
         parse(try await InnerTube.shared.web("live_chat/get_live_chat_replay", [
             "continuation": continuation, "currentPlayerState": ["playerOffsetMs": String(max(0, offsetMs))],
         ]))

@@ -535,7 +535,10 @@ final class VideoPlayerModel {
         guard let track = selectedCaption,
               let (data, _) = try? await URLSession.shared.data(from: track.url),
               let text = String(data: data, encoding: .utf8), selectedCaption == track else { return }
-        cues = Self.parseVTT(text)
+        // A long auto-generated track is thousands of cues with a regex each: parse it off the main thread.
+        let parsed = await Task.detached(priority: .userInitiated) { Self.parseVTT(text) }.value
+        guard selectedCaption == track else { return }
+        cues = parsed
         updateCaption(player.currentTime().seconds)
     }
 

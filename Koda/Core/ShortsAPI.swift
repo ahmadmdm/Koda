@@ -37,17 +37,17 @@ nonisolated enum ShortsAPI {
     static var api: InnerTube { .shared }
 
     /// Shorts lockups of a search, for a shelf.
-    static func search(_ query: String) async throws -> [ShortItem] {
+    @concurrent static func search(_ query: String) async throws -> [ShortItem] {
         lockups(in: try await api.web("search", ["query": query]))
     }
 
     /// A channel's Shorts tab.
-    static func channel(_ channelId: String) async throws -> [ShortItem] {
+    @concurrent static func channel(_ channelId: String) async throws -> [ShortItem] {
         lockups(in: try await api.web("browse", ["browseId": channelId, "params": "EgZzaG9ydHPyBgUKA5oBAA%3D%3D"]))
     }
 
     /// YouTube's own "Shorts" tab start: one Short plus the token of the sequence after it.
-    static func seedless() async throws -> ShortsPage {
+    @concurrent static func seedless() async throws -> ShortsPage {
         let root = try await api.web("reel/reel_item_watch", [
             "params": "CA8%3D", "inputType": "REEL_WATCH_INPUT_TYPE_SEEDLESS", "disablePlayerResponse": true,
         ])
@@ -60,7 +60,7 @@ nonisolated enum ShortsAPI {
     }
 
     /// The next page of the swipe feed. Seed params and continuation tokens go in the same field.
-    static func sequence(_ params: String) async throws -> ShortsPage {
+    @concurrent static func sequence(_ params: String) async throws -> ShortsPage {
         let root = try await api.web("reel/reel_watch_sequence", ["sequenceParams": params])
         var seen = Set<String>()
         // Only top-level entries belong to the page; nested endpoints are unrelated UI actions.
@@ -69,7 +69,7 @@ nonisolated enum ShortsAPI {
         return ShortsPage(items: items, continuation: root.path("continuationEndpoint.continuationCommand.token").string)
     }
 
-    static func details(_ videoId: String) async throws -> ShortDetails {
+    @concurrent static func details(_ videoId: String) async throws -> ShortDetails {
         let root = try await api.web("reel/reel_item_watch", ["playerRequest": ["videoId": videoId], "disablePlayerResponse": true])
         let header = root.first("videoDescriptionHeaderRenderer")
         let channelId = header.path("channelNavigationEndpoint.browseEndpoint.browseId").string

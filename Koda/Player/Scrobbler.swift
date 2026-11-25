@@ -172,8 +172,12 @@ final class Scrobbler {
         guard loop == nil else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
-                self?.sample()
-                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                self.sample()
+                // Without a Last.fm session (most listeners) there is nothing to measure: look again
+                // every 10 seconds instead of waking the app every second, in the background too.
+                let interval: Duration = self.active ? .seconds(1) : .seconds(10)
+                try? await Task.sleep(for: interval)
             }
         }
     }

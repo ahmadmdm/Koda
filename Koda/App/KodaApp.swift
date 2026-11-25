@@ -15,9 +15,14 @@ struct KodaApp: App {
     @AppStorage("onboarded") private var onboarded = false
 
     init() {
-        Scrobbler.shared.start()
-        Task { await LocalMusicLibrary.shared.rescan() }
-        Diagnostics.shared.start()
+        // Nothing here is needed for the first frame: the Last.fm queue and Keychain read, the Music
+        // folder scan and saving MetricKit's reports wait until the UI is up.
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            Scrobbler.shared.start()
+            await LocalMusicLibrary.shared.rescan()
+        }
+        Task.detached(priority: .utility) { Diagnostics.shared.start() }
         // The background download session has to exist at launch to hear about downloads that ran while Koda was closed.
         _ = VideoDownloadManager.shared
     }
@@ -42,15 +47,10 @@ struct KodaApp: App {
         }
     }
 
-    /// iOS 27 lets AsyncImage use a custom URLSession: give artwork a 200 MB disk cache so covers
-    /// scrolled past once load instantly afterwards.
+    /// iOS 27 lets AsyncImage use a custom URLSession: give it the artwork session and its 200 MB disk
+    /// cache, so any AsyncImage shares the covers `Artwork` has already downloaded.
     struct ArtworkCache: ViewModifier {
-        static let session: URLSession = {
-            let config = URLSessionConfiguration.default
-            config.urlCache = URLCache(memoryCapacity: 40 << 20, diskCapacity: 200 << 20, directory: nil)
-            config.requestCachePolicy = .returnCacheDataElseLoad
-            return URLSession(configuration: config)
-        }()
+        static var session: URLSession { ArtworkLoader.session }
 
         func body(content: Content) -> some View {
             if #available(iOS 27.0, *) {

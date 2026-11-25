@@ -34,14 +34,15 @@ struct StatsView: View {
         let artists = library.topArtists(since: since, limit: 10)
         let seconds = library.listeningSeconds(since: since)
         let hours = library.playsByHour(since: since)
+        let plays = library.plays(since: since)
         List {
             Picker("Period", selection: $period) { ForEach(StatsPeriod.allCases) { Text($0.title).tag($0) } }
                 .pickerStyle(.segmented).listRowBackground(Color.clear)
             Section {
                 HStack {
                     stat(Int(seconds / 60).formatted(), "minutes")
-                    stat(library.plays(since: since).count.formatted(), "plays")
-                    stat(Set(library.plays(since: since).map(\.song.id)).count.formatted(), "songs")
+                    stat(plays.count.formatted(), "plays")
+                    stat(Set(plays.map(\.song.id)).count.formatted(), "songs")
                 }
             }
             Section("When you listen") {
@@ -132,7 +133,9 @@ struct RecapView: View {
                         Text("Your record").font(.title3)
                         record.frame(width: 240, height: 240)
                         Text("One ring for each day, in the colours of your covers.").font(.footnote).opacity(0.8)
-                        ShareLink(item: renderShare(top: top), preview: SharePreview("My Koda Recap", image: renderShare(top: top))) {
+                        // ImageRenderer draws the card on the main thread: once per render, not twice.
+                        let share = renderShare(top: top)
+                        ShareLink(item: share, preview: SharePreview("My Koda Recap", image: share)) {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
                         .buttonStyle(.glass)

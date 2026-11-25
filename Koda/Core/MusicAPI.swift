@@ -29,7 +29,7 @@ nonisolated enum MusicAPI {
 
     // MARK: Search
 
-    static func search(_ query: String, filter: MusicSearchFilter, continuation: String? = nil) async throws -> ([MusicCard], String?) {
+    @concurrent static func search(_ query: String, filter: MusicSearchFilter, continuation: String? = nil) async throws -> ([MusicCard], String?) {
         let root: J
         if let continuation {
             root = try await api.music("search", ["continuation": continuation])
@@ -46,14 +46,14 @@ nonisolated enum MusicAPI {
         return (items, next)
     }
 
-    static func suggestions(_ query: String) async -> [String] {
+    @concurrent static func suggestions(_ query: String) async -> [String] {
         guard let root = try? await api.music("music/get_search_suggestions", ["input": query]) else { return [] }
         return root.findAll("searchSuggestionRenderer").compactMap { $0["suggestion"].text }
     }
 
     // MARK: Home
 
-    static func home(continuation: String? = nil) async throws -> MusicHome {
+    @concurrent static func home(continuation: String? = nil) async throws -> MusicHome {
         let root = try await api.music("browse", continuation == nil ? ["browseId": "FEmusic_home"] : ["continuation": continuation!])
         return parseHome(root)
     }
@@ -64,7 +64,7 @@ nonisolated enum MusicAPI {
         return MusicHome(shelves: shelves, continuation: next)
     }
 
-    static func explore(_ browseId: String) async throws -> [MusicShelf] {
+    @concurrent static func explore(_ browseId: String) async throws -> [MusicShelf] {
         let root = try await api.music("browse", ["browseId": browseId])
         var shelves = root.findAll("musicCarouselShelfRenderer").compactMap(parseCarousel)
         let list = root.findAll("musicResponsiveListItemRenderer").compactMap(parseListItem)
@@ -74,7 +74,7 @@ nonisolated enum MusicAPI {
 
     // MARK: Collections
 
-    static func collection(_ browseId: String) async throws -> CollectionPage {
+    @concurrent static func collection(_ browseId: String) async throws -> CollectionPage {
         let id = browseId.hasPrefix("VL") || browseId.hasPrefix("MPRE") || browseId.hasPrefix("FE") ? browseId : "VL" + browseId
         let root = try await api.music("browse", ["browseId": id])
         return parseCollection(root, id: id)
@@ -110,7 +110,7 @@ nonisolated enum MusicAPI {
                               description: description, thumbnail: thumb, songs: songs, isAlbum: isAlbum)
     }
 
-    static func artist(_ browseId: String) async throws -> ArtistPage {
+    @concurrent static func artist(_ browseId: String) async throws -> ArtistPage {
         let root = try await api.music("browse", ["browseId": browseId])
         return parseArtist(root, browseId: browseId)
     }
@@ -132,7 +132,7 @@ nonisolated enum MusicAPI {
 
     // MARK: Radio / up next
 
-    static func radio(for videoId: String, playlistId: String? = nil) async throws -> [Song] {
+    @concurrent static func radio(for videoId: String, playlistId: String? = nil) async throws -> [Song] {
         let root = try await api.music("next", ["videoId": videoId, "playlistId": playlistId ?? "RDAMVM\(videoId)", "isAudioOnly": true])
         return parseRadio(root)
     }
@@ -150,13 +150,13 @@ nonisolated enum MusicAPI {
         return true
     }
 
-    static func lyricsBrowseId(for videoId: String) async -> String? {
+    @concurrent static func lyricsBrowseId(for videoId: String) async -> String? {
         guard let root = try? await api.music("next", ["videoId": videoId, "isAudioOnly": true]) else { return nil }
         return root.findAll("tabRenderer").compactMap { $0.path("endpoint.browseEndpoint.browseId").string }
             .first { $0.hasPrefix("MPLY") }
     }
 
-    static func youtubeLyrics(for videoId: String) async -> String? {
+    @concurrent static func youtubeLyrics(for videoId: String) async -> String? {
         guard let id = await lyricsBrowseId(for: videoId),
               let root = try? await api.music("browse", ["browseId": id]) else { return nil }
         return root.first("musicDescriptionShelfRenderer")["description"].text

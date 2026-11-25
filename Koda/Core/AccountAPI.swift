@@ -10,7 +10,7 @@ nonisolated enum AccountAPI {
     // MARK: Identity
 
     /// Name, handle and picture from `account/account_menu`, stored on the account that asked.
-    static func refreshProfile() async {
+    @concurrent static func refreshProfile() async {
         guard let account = AccountSession.shared.active,
               let root = try? await api.music("account/account_menu", [:]) else { return }
         let header = root.first("activeAccountHeaderRenderer")
@@ -25,54 +25,54 @@ nonisolated enum AccountAPI {
     // MARK: YouTube Music library
 
     /// Playlists in the account's library (`FEmusic_liked_playlists`): its own and saved ones.
-    static func libraryPlaylists() async throws -> [MusicCard] {
+    @concurrent static func libraryPlaylists() async throws -> [MusicCard] {
         let root = try await api.music("browse", ["browseId": "FEmusic_liked_playlists"])
         return root.findAll("musicTwoRowItemRenderer").compactMap(MusicAPI.parseTwoRow)
             .filter { $0.kind == .playlist && $0.id != "VLLM" }
     }
 
-    static func libraryAlbums() async throws -> [MusicCard] {
+    @concurrent static func libraryAlbums() async throws -> [MusicCard] {
         let root = try await api.music("browse", ["browseId": "FEmusic_liked_albums"])
         return root.findAll("musicTwoRowItemRenderer").compactMap(MusicAPI.parseTwoRow)
     }
 
-    static func libraryArtists() async throws -> [MusicCard] {
+    @concurrent static func libraryArtists() async throws -> [MusicCard] {
         let root = try await api.music("browse", ["browseId": "FEmusic_library_corpus_track_artists"])
         return root.findAll("musicResponsiveListItemRenderer").compactMap(MusicAPI.parseListItem).filter { $0.kind == .artist }
     }
 
     /// The account's "Liked music" playlist.
-    static func likedSongs() async throws -> [Song] {
+    @concurrent static func likedSongs() async throws -> [Song] {
         try await MusicAPI.collection("VLLM").songs
     }
 
     // MARK: Writes
 
     /// Likes or unlikes a song on the account (music.youtube.com).
-    static func setSongLiked(_ videoId: String, _ liked: Bool) async -> Bool {
+    @concurrent static func setSongLiked(_ videoId: String, _ liked: Bool) async -> Bool {
         guard isSignedIn else { return false }
         return (try? await api.music(liked ? "like/like" : "like/removelike", ["target": ["videoId": videoId]])) != nil
     }
 
     /// Likes or unlikes a video on the account (www.youtube.com).
-    static func setVideoLiked(_ videoId: String, _ liked: Bool) async -> Bool {
+    @concurrent static func setVideoLiked(_ videoId: String, _ liked: Bool) async -> Bool {
         guard isSignedIn else { return false }
         return (try? await api.web(liked ? "like/like" : "like/removelike", ["target": ["videoId": videoId]])) != nil
     }
 
     /// Saves an album or playlist to the account's library, or removes it.
-    static func setPlaylistSaved(_ browseId: String, _ saved: Bool) async -> Bool {
+    @concurrent static func setPlaylistSaved(_ browseId: String, _ saved: Bool) async -> Bool {
         guard isSignedIn else { return false }
         let id = browseId.hasPrefix("VL") ? String(browseId.dropFirst(2)) : browseId
         return (try? await api.music(saved ? "like/like" : "like/removelike", ["target": ["playlistId": id]])) != nil
     }
 
-    static func setSubscribed(_ channelId: String, _ subscribed: Bool) async -> Bool {
+    @concurrent static func setSubscribed(_ channelId: String, _ subscribed: Bool) async -> Bool {
         guard isSignedIn, channelId.hasPrefix("UC") else { return false }
         return (try? await api.web(subscribed ? "subscription/subscribe" : "subscription/unsubscribe", ["channelIds": [channelId]])) != nil
     }
 
-    static func addToWatchLater(_ videoId: String) async -> Bool {
+    @concurrent static func addToWatchLater(_ videoId: String) async -> Bool {
         guard isSignedIn else { return false }
         return (try? await api.web("browse/edit_playlist", [
             "playlistId": "WL", "actions": [["action": "ACTION_ADD_VIDEO", "addedVideoId": videoId]],
@@ -82,24 +82,24 @@ nonisolated enum AccountAPI {
     // MARK: YouTube feeds
 
     /// The account's own Home feed.
-    static func videoHome() async throws -> [Video] {
+    @concurrent static func videoHome() async throws -> [Video] {
         let root = try await api.web("browse", ["browseId": "FEwhat_to_watch"])
         return videos(in: root)
     }
 
     /// Uploads from the account's subscriptions, newest first.
-    static func subscriptionsFeed() async throws -> [Video] {
+    @concurrent static func subscriptionsFeed() async throws -> [Video] {
         let root = try await api.web("browse", ["browseId": "FEsubscriptions"])
         return videos(in: root)
     }
 
-    static func watchHistory() async throws -> [Video] {
+    @concurrent static func watchHistory() async throws -> [Video] {
         let root = try await api.web("browse", ["browseId": "FEhistory"])
         return videos(in: root)
     }
 
     /// Channels the account is subscribed to (`FEchannels`).
-    static func subscribedChannels() async throws -> [ChannelSummary] {
+    @concurrent static func subscribedChannels() async throws -> [ChannelSummary] {
         let root = try await api.web("browse", ["browseId": "FEchannels"])
         return root.findAll("channelRenderer").compactMap(VideoAPI.parseChannelRenderer)
     }

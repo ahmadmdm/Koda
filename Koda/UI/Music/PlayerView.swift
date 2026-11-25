@@ -522,10 +522,7 @@ struct DialStyle: View {
             Spacer(minLength: 0)
             ZStack {
                 Circle().stroke(.primary.opacity(0.12), lineWidth: 8)
-                Circle().trim(from: 0, to: player.duration > 0 ? player.currentTime / player.duration : 0)
-                    .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.25), value: player.currentTime)
+                DialProgress()
                 TimelineView(.animation(paused: !player.isPlaying)) { context in
                     Artwork(url: player.current?.artwork, cornerRadius: 1000)
                         .overlay(Circle().fill(Color(.systemBackground)).frame(width: 36, height: 36))
@@ -538,14 +535,33 @@ struct DialStyle: View {
             .padding(.horizontal, 36)
             Spacer(minLength: 0)
             TitleBlock(alignment: .center)
-            HStack {
-                Text(player.currentTime.formattedDuration)
-                Spacer()
-                Text(player.duration.formattedDuration)
-            }
-            .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+            DialTimes()
             PlayerControls().padding(.bottom, 16)
         }
         .padding(.horizontal, 26)
+    }
+}
+
+/// The dial's ring and times read the play position on their own, so the rest of the Dial style
+/// (the spinning artwork, the title, the controls) doesn't redraw four times a second.
+private struct DialProgress: View {
+    @Environment(MusicPlayer.self) private var player
+    var body: some View {
+        Circle().trim(from: 0, to: player.duration > 0 ? player.currentTime / player.duration : 0)
+            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+            .animation(.linear(duration: 0.25), value: player.currentTime)
+    }
+}
+
+private struct DialTimes: View {
+    @Environment(MusicPlayer.self) private var player
+    var body: some View {
+        HStack {
+            Text(player.currentTime.formattedDuration)
+            Spacer()
+            Text(player.duration.formattedDuration)
+        }
+        .font(.callout.monospacedDigit()).foregroundStyle(.secondary)
     }
 }

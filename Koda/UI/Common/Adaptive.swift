@@ -50,3 +50,13 @@ struct VideoGrid: View {
         .padding(.horizontal)
     }
 }
+
+/// What a screen last loaded and when, so coming back to it (a navigation pop, a tab switch, which
+/// restart its `.task`) doesn't fetch the same pages again while they are fresh.
+struct LoadStamp: Equatable {
+    static let freshness: TimeInterval = 10 * 60
+    var key: String
+    var date = Date()
+
+    func isFresh(for key: String) -> Bool { self.key == key && Date().timeIntervalSince(date) < Self.freshness }
+}

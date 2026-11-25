@@ -15,7 +15,8 @@ final class ArtworkTint {
     private let context = CIContext(options: [.workingColorSpace: NSNull()])
 
     func update(from url: URL?) async {
-        guard let url, let (data, _) = try? await URLSession.shared.data(from: url), let image = UIImage(data: data) else { return }
+        // The same download and decode as the Now Playing artwork, which asks for this cover too.
+        guard let url, let image = await ArtworkLoader.shared.fullImage(url) else { return }
         self.image = image
         let extracted = await Task.detached(priority: .utility) { [context] in
             Self.extract(image, context: context)

@@ -24,6 +24,7 @@ struct MusicHomeView: View {
     @State private var error: String?
     @State private var loading = false
     @State private var spinning = false
+    @State private var loadStamp: LoadStamp?
 
     var body: some View {
         ScrollView {
@@ -75,7 +76,14 @@ struct MusicHomeView: View {
             }
         }
         .refreshable { await load() }
-        .task(id: account.active?.id) { await load() }
+        .task(id: account.active?.id) {
+            // Coming back to Home (a pop, a tab switch) keeps what it showed for a while instead of
+            // fetching Home, a radio and a search again; pull to refresh still reloads.
+            let key = account.active?.id.uuidString ?? ""
+            guard loadStamp?.isFresh(for: key) != true else { return }
+            await load()
+            if !Task.isCancelled, error == nil { loadStamp = LoadStamp(key: key) }
+        }
     }
 
     private var greeting: String {

@@ -66,7 +66,7 @@ nonisolated struct VideoTopic: Hashable, Identifiable, Sendable {
 nonisolated enum VideoAPI {
     static var api: InnerTube { .shared }
 
-    static func search(_ query: String, filter: VideoSearchFilter, sort: VideoSort = .relevance, continuation: String? = nil) async throws -> ([VideoSearchResult], String?) {
+    @concurrent static func search(_ query: String, filter: VideoSearchFilter, sort: VideoSort = .relevance, continuation: String? = nil) async throws -> ([VideoSearchResult], String?) {
         var body: [String: Any] = [:]
         if let continuation { body["continuation"] = continuation } else {
             body["query"] = query
@@ -101,7 +101,7 @@ nonisolated enum VideoAPI {
         return (results, next)
     }
 
-    static func feed(topic: VideoTopic, seeds: [String]) async throws -> [Video] {
+    @concurrent static func feed(topic: VideoTopic, seeds: [String]) async throws -> [Video] {
         if topic.query.isEmpty {
             // "For You": related videos of what was watched recently, else a broad query.
             var videos: [Video] = []
@@ -117,7 +117,7 @@ nonisolated enum VideoAPI {
         return try await search(topic.query, filter: .videos).0.compactMap { if case .video(let v) = $0 { v } else { nil } }
     }
 
-    static func suggestions(_ query: String) async -> [String] {
+    @concurrent static func suggestions(_ query: String) async -> [String] {
         guard let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&xhr=t&oe=utf-8&hl=\(api.language)&gl=\(api.region)&q=\(q)"),
               let (data, _) = try? await URLSession.shared.data(from: url) else { return [] }
@@ -131,7 +131,7 @@ nonisolated enum VideoAPI {
 
     // MARK: Watch page
 
-    static func watch(_ videoId: String) async throws -> WatchDetails {
+    @concurrent static func watch(_ videoId: String) async throws -> WatchDetails {
         let root = try await api.web("next", ["videoId": videoId])
         return parseWatch(root, videoId: videoId)
     }
@@ -173,7 +173,7 @@ nonisolated enum VideoAPI {
     }
 
     /// Shorts comments page through `browse` rather than `next`.
-    static func comments(token: String, endpoint: String = "next") async throws -> ([Comment], String?) {
+    @concurrent static func comments(token: String, endpoint: String = "next") async throws -> ([Comment], String?) {
         let root = try await api.web(endpoint, ["continuation": token])
         let (comments, tokens) = parseComments(root)
         if comments.isEmpty, let first = tokens.first, first != token {
@@ -206,7 +206,7 @@ nonisolated enum VideoAPI {
 
     // MARK: Channel
 
-    static func channel(_ channelId: String) async throws -> ChannelPage {
+    @concurrent static func channel(_ channelId: String) async throws -> ChannelPage {
         let root = try await api.web("browse", ["browseId": channelId, "params": "EgZ2aWRlb3PyBgQKAjoA"])
         return parseChannel(root, channelId: channelId)
     }
@@ -242,13 +242,13 @@ nonisolated enum VideoAPI {
     }
 
     /// Public RSS feed of a channel: the subscriptions feed for local follows, without an account.
-    static func rssFeed(channelId: String) async -> [Video] {
+    @concurrent static func rssFeed(channelId: String) async -> [Video] {
         guard let url = URL(string: "https://www.youtube.com/feeds/videos.xml?channel_id=\(channelId)"),
               let (data, _) = try? await URLSession.shared.data(from: url) else { return [] }
         return ChannelFeedParser.parse(data)
     }
 
-    static func playlist(_ playlistId: String) async throws -> (String, [Video]) {
+    @concurrent static func playlist(_ playlistId: String) async throws -> (String, [Video]) {
         let id = playlistId.hasPrefix("VL") ? playlistId : "VL" + playlistId
         let root = try await api.web("browse", ["browseId": id])
         let title = root.path("metadata.playlistMetadataRenderer.title").string ?? root.first("pageHeaderViewModel")["title"].text ?? String(localized: "Playlist")

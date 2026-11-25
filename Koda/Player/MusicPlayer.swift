@@ -20,9 +20,12 @@ enum RepeatMode: String, CaseIterable { case off, all, one
 final class MusicPlayer {
     static let shared = MusicPlayer()
 
-    private(set) var queue: [Song] = []
-    private(set) var index: Int = 0
+    private(set) var queue: [Song] = [] { didSet { queueChanged = true; syncCurrentId() } }
+    private(set) var index: Int = 0 { didSet { syncCurrentId() } }
     var current: Song? { queue.indices.contains(index) ? queue[index] : nil }
+    /// The current song's id, stored apart from `queue`: song rows compare against it, and reading
+    /// `current` would redraw every visible row whenever the queue grows or a duration is filled in.
+    private(set) var currentId: String?
     var upNext: [Song] { queue.indices.contains(index + 1) ? Array(queue[(index + 1)...]) : [] }
 
     private(set) var isPlaying = false
@@ -67,6 +70,10 @@ final class MusicPlayer {
     @ObservationIgnored private var itemSongId: String?
     @ObservationIgnored private var wasPlayingBeforeInterruption = false
     @ObservationIgnored private var artworkLoadingId: String?
+    /// Whether `queue` changed since the session last saved it, and which window of it was saved.
+    @ObservationIgnored private var queueChanged = true
+    @ObservationIgnored private var savedQueueStart = -1
+    @ObservationIgnored private var savedPositionBucket = -1
 
     var library: LibraryStore { .shared }
 
@@ -108,6 +115,11 @@ final class MusicPlayer {
                 guard let self, self.isPlaying || self.wantsPlayback else { return }
                 self.stopPlayback()
             }
+        }
+        // Going to the background, keep the play record's listened time current, which is otherwise
+        // written every 30 seconds.
+        NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.flushPlayRecord() }
         }
         setupRemoteCommands()
         restoreSession()
@@ -421,6 +433,8 @@ final class MusicPlayer {
         }
         let low = UserDefaults.standard.string(forKey: "musicQuality") == "low"
         guard let url = (low ? info.lowAudioURL : info.audioURL) ?? info.audioURL ?? info.hlsURL else { throw InnerTubeError.noStream }
+        // Expired URLs are never used again: drop them, so a long radio session doesn't keep them all.
+        if resolved.count > 50 { resolved = resolved.filter { $0.value.expires > .now } }
         resolved[song.id] = (url, info.loudnessDb, Date().addingTimeInterval(5 * 3600))
         if let i = queue.firstIndex(where: { $0.id == song.id }), info.duration > 0 {
             queue[i].duration = Int(info.duration)
@@ -509,7 +523,7 @@ final class MusicPlayer {
         lastTick = seconds
         currentTime = seconds
         if (current?.duration ?? 0) == 0, let d = player.currentItem?.duration.seconds, d.isFinite, d > 0, abs(d - duration) > 0.5 { duration = d }
-        else if let known = current?.duration, known > 0 { duration = Double(known) }
+        else if let known = current?.duration, known > 0, duration != Double(known) { duration = Double(known) }
         // Should the file run past YouTube's stated length, end the track there.
         if duration > 0, isPlaying, !isLoading, seconds >= duration + 1 { trackEnded() }
         if isPlaying && player.timeControlStatus == .paused && player.currentItem?.status == .readyToPlay && player.rate == 0 && !isLoading {
@@ -517,20 +531,34 @@ final class MusicPlayer {
             isPlaying = false
             updateNowPlaying()
         }
-        if Int(seconds) % 10 == 0 { UserDefaults.standard.set(seconds, forKey: "sessionPosition") }
+        // Once every 10 seconds, not on each of the four ticks within that second.
+        let bucket = Int(seconds) / 10
+        if bucket != savedPositionBucket {
+            savedPositionBucket = bucket
+            UserDefaults.standard.set(seconds, forKey: "sessionPosition")
+        }
     }
 
     /// A play is recorded once 10 seconds have been heard, then its listened time is kept
-    /// current, so plays survive the app being closed mid-song.
+    /// current, so plays survive the app being closed mid-song. Each update rewrites the whole
+    /// library file and redraws every view of the library, so it happens every 30 seconds (and when
+    /// the app goes to the background), not every few.
     private func updatePlayRecord() {
         guard let song = current, listenedSeconds >= 10 else { return }
         if let i = playRecordIndex, library.data.plays.indices.contains(i), library.data.plays[i].song.id == song.id {
-            guard listenedSeconds - lastRecordedSeconds >= 5 else { return }
+            guard listenedSeconds - lastRecordedSeconds >= 30 else { return }
             library.data.plays[i].seconds = listenedSeconds
         } else {
             library.recordPlay(song, seconds: listenedSeconds)
             playRecordIndex = library.data.plays.count - 1
         }
+        lastRecordedSeconds = listenedSeconds
+    }
+
+    private func flushPlayRecord() {
+        guard let song = current, let i = playRecordIndex, listenedSeconds > lastRecordedSeconds,
+              library.data.plays.indices.contains(i), library.data.plays[i].song.id == song.id else { return }
+        library.data.plays[i].seconds = listenedSeconds
         lastRecordedSeconds = listenedSeconds
     }
 
@@ -549,7 +577,13 @@ final class MusicPlayer {
         WidgetSync.update(self)
         // Keep at most 300 songs, around the current one so it is always among them.
         let start = queue.count > 300 ? min(max(0, index - 50), queue.count - 300) : 0
-        if let data = try? JSONEncoder().encode(Array(queue[start...].prefix(300))) { UserDefaults.standard.set(data, forKey: "sessionQueue") }
+        // Play, pause and skipping within the saved window leave the saved songs as they are: encode
+        // them again only when they change.
+        if queueChanged || start != savedQueueStart {
+            if let data = try? JSONEncoder().encode(Array(queue[start...].prefix(300))) { UserDefaults.standard.set(data, forKey: "sessionQueue") }
+            queueChanged = false
+            savedQueueStart = start
+        }
         UserDefaults.standard.set(index - start, forKey: "sessionIndex")
         UserDefaults.standard.set(currentTime, forKey: "sessionPosition")
     }
@@ -561,6 +595,15 @@ final class MusicPlayer {
         index = min(UserDefaults.standard.integer(forKey: "sessionIndex"), saved.count - 1)
         currentTime = UserDefaults.standard.double(forKey: "sessionPosition")
         duration = Double(current?.duration ?? 0)
+        syncCurrentId()
+        // What was just read is what is saved.
+        queueChanged = false
+        savedQueueStart = 0
+    }
+
+    private func syncCurrentId() {
+        let id = current?.id
+        if id != currentId { currentId = id }
     }
 
     /// Restore the previous session's player item without starting playback.
@@ -658,7 +701,8 @@ final class MusicPlayer {
         else if let url = song.artwork, artworkLoadingId != song.id {
             artworkLoadingId = song.id
             Task {
-                let image = (try? await URLSession.shared.data(from: url)).flatMap { UIImage(data: $0.0) }
+                // Shared with the artwork tint, which asks for the same cover at the same moment.
+                let image = await ArtworkLoader.shared.fullImage(url)
                 if self.artworkLoadingId == song.id { self.artworkLoadingId = nil }
                 // The song may have changed while the artwork loaded: never show it on the next one.
                 guard let image, self.current?.id == song.id else { return }

@@ -328,6 +328,7 @@ struct AccountMusicLibrarySection: View {
     @Environment(AccountModel.self) private var account
     @State private var playlists: [MusicCard] = []
     @State private var albums: [MusicCard] = []
+    @State private var loadStamp: LoadStamp?
 
     var body: some View {
         Section {
@@ -352,8 +353,11 @@ struct AccountMusicLibrarySection: View {
             Label(account.active?.name ?? String(localized: "YouTube Music"), systemImage: "person.crop.circle")
         }
         .task(id: account.active?.id) {
+            let key = account.active?.id.uuidString ?? ""
+            guard loadStamp?.isFresh(for: key) != true else { return }
             playlists = (try? await AccountAPI.libraryPlaylists()) ?? []
             albums = (try? await AccountAPI.libraryAlbums()) ?? []
+            if !Task.isCancelled, !(playlists + albums).isEmpty { loadStamp = LoadStamp(key: key) }
         }
     }
 }

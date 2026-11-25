@@ -58,7 +58,7 @@ nonisolated struct LibraryData: Codable, Sendable {
 final class LibraryStore {
     static let shared = LibraryStore()
 
-    var data: LibraryData { didSet { scheduleSave() } }
+    var data: LibraryData { didSet { derived = Derived(); scheduleSave() } }
 
     private let url: URL = {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -66,6 +66,15 @@ final class LibraryStore {
         return dir.appendingPathComponent("library.json")
     }()
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+
+    /// Values worked out from `plays`, kept until `data` next changes: Home, Speed dial and CarPlay
+    /// ask for them on every render, and each is a pass over up to 20,000 plays.
+    private struct Derived {
+        var recentSongs: [Song]?
+        var topSongs: [Int: [(song: Song, plays: Int, seconds: Double)]] = [:]
+        var topArtists: [Int: [(name: String, plays: Int, thumbnail: String?)]] = [:]
+    }
+    @ObservationIgnored private var derived = Derived()
 
     init() {
         if let raw = try? Data(contentsOf: url), let decoded = try? JSONDecoder().decode(LibraryData.self, from: raw) {
@@ -149,11 +158,24 @@ final class LibraryStore {
     }
 
     var recentSongs: [Song] {
+        // Read `data` even on a cache hit, so a view using this still updates when the library changes.
+        access(keyPath: \.data)
+        if let cached = derived.recentSongs { return cached }
         var seen = Set<String>()
-        return data.plays.reversed().map(\.song).filter { seen.insert($0.id).inserted }
+        let songs = data.plays.reversed().map(\.song).filter { seen.insert($0.id).inserted }
+        derived.recentSongs = songs
+        return songs
     }
 
     func topSongs(since: Date? = nil, limit: Int = 50) -> [(song: Song, plays: Int, seconds: Double)] {
+        access(keyPath: \.data)
+        if since == nil, let cached = derived.topSongs[limit] { return cached }
+        let top = computeTopSongs(since: since, limit: limit)
+        if since == nil { derived.topSongs[limit] = top }
+        return top
+    }
+
+    private func computeTopSongs(since: Date?, limit: Int) -> [(song: Song, plays: Int, seconds: Double)] {
         var counts: [String: (Song, Int, Double)] = [:]
         for p in data.plays where since.map({ p.date >= $0 }) ?? true {
             let c = counts[p.song.id] ?? (p.song, 0, 0)
@@ -163,6 +185,14 @@ final class LibraryStore {
     }
 
     func topArtists(since: Date? = nil, limit: Int = 20) -> [(name: String, plays: Int, thumbnail: String?)] {
+        access(keyPath: \.data)
+        if since == nil, let cached = derived.topArtists[limit] { return cached }
+        let top = computeTopArtists(since: since, limit: limit)
+        if since == nil { derived.topArtists[limit] = top }
+        return top
+    }
+
+    private func computeTopArtists(since: Date?, limit: Int) -> [(name: String, plays: Int, thumbnail: String?)] {
         var counts: [String: (Int, String?)] = [:]
         for p in data.plays where since.map({ p.date >= $0 }) ?? true {
             let name = p.song.artist.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? p.song.artist

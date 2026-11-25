@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum Route: Hashable {
     case album(String), playlist(String), artist(String), localPlaylist(UUID)
@@ -53,23 +54,44 @@ struct Artwork: View {
     var cornerRadius: CGFloat = 8
     var placeholderIcon = "music.note"
 
+    @Environment(\.displayScale) private var displayScale
+    @State private var size: CGSize = .zero
+    @State private var loaded: Loaded?
+
+    private struct Loaded { var url: URL; var image: UIImage }
+    private struct LoadKey: Equatable { var url: URL?; var pixels: CGSize }
+
     var body: some View {
+        let pixels = ArtworkLoader.pixelSize(size, scale: displayScale)
+        // What was loaded for this URL, else a decoded copy already in memory (shown at once, as when a
+        // row scrolls back in), else the placeholder.
+        let image = loaded.flatMap { $0.url == url ? $0.image : nil } ?? url.flatMap { ArtworkLoader.shared.anyCached($0) }
         // Color.clear takes exactly the proposed size; the image fills it as an
         // overlay, so a wide image can never widen the layout.
         Color.clear
             .overlay {
-                AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.25))) { phase in
-                    switch phase {
-                    case .success(let image): image.resizable().scaledToFill()
-                    default:
-                        ZStack {
-                            Rectangle().fill(.quaternary)
-                            Image(systemName: placeholderIcon).font(.title2).foregroundStyle(.secondary)
-                        }
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    ZStack {
+                        Rectangle().fill(.quaternary)
+                        Image(systemName: placeholderIcon).font(.title2).foregroundStyle(.secondary)
                     }
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+            .task(id: LoadKey(url: url, pixels: pixels)) {
+                guard let url, pixels != .zero else { return }
+                let showing = image != nil
+                guard let fresh = await ArtworkLoader.shared.image(url, filling: pixels), !Task.isCancelled else { return }
+                // Fade in over the placeholder, as AsyncImage did; a sharper copy replaces the old one quietly.
+                if showing {
+                    loaded = Loaded(url: url, image: fresh)
+                } else {
+                    withAnimation(.easeOut(duration: 0.25)) { loaded = Loaded(url: url, image: fresh) }
+                }
+            }
     }
 }
 
@@ -131,7 +153,7 @@ struct SongRow: View {
                     Artwork(url: song.artwork, cornerRadius: 6)
                         .frame(width: 50, height: 50)
                         .overlay {
-                            if player.current?.id == song.id {
+                            if player.currentId == song.id {
                                 RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.45))
                                 Image(systemName: "waveform").symbolEffect(.variableColor.iterative, isActive: player.isPlaying)
                                     .foregroundStyle(.white)
@@ -140,7 +162,7 @@ struct SongRow: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).font(.body).lineLimit(1)
-                        .foregroundStyle(player.current?.id == song.id ? Color.accentColor : .primary)
+                        .foregroundStyle(player.currentId == song.id ? Color.accentColor : .primary)
                     HStack(spacing: 4) {
                         if downloads.isDownloaded(song.id) {
                             Image(systemName: "arrow.down.circle.fill").font(.caption2).foregroundStyle(.tint)

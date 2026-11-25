@@ -58,6 +58,9 @@ struct LyricsPanel: View {
     @AppStorage("lyricsSize") private var size: Double = 28
     @State private var lyrics: Lyrics?
     @State private var loading = true
+    /// The line being sung, set by `LyricsClock`, so the lyrics redraw when it changes rather than on
+    /// every one of the player's four time updates a second.
+    @State private var active = -1
 
     var body: some View {
         Group {
@@ -90,8 +93,7 @@ struct LyricsPanel: View {
     }
 
     private func synced(_ lines: [LyricLine], source: String) -> some View {
-        let t = player.currentTime + offset
-        let active = lines.lastIndex { $0.time <= t } ?? -1
+        let active = self.active
         return ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
@@ -117,6 +119,7 @@ struct LyricsPanel: View {
             .onChange(of: active) { _, new in
                 withAnimation(.smooth(duration: 0.5)) { proxy.scrollTo(new, anchor: UnitPoint(x: 0, y: 0.3)) }
             }
+            .background { LyricsClock(lines: lines, offset: offset, active: $active) }
             .overlay(alignment: .topTrailing) {
                 Menu {
                     Section("Timing") {
@@ -136,6 +139,21 @@ struct LyricsPanel: View {
                 .padding(.trailing, 16)
             }
         }
+    }
+}
+
+/// Follows the play position, which changes four times a second: only this empty view redraws on
+/// each change, and it hands the lyrics the line being sung.
+private struct LyricsClock: View {
+    var lines: [LyricLine]
+    var offset: Double
+    @Binding var active: Int
+    @Environment(MusicPlayer.self) private var player
+
+    var body: some View {
+        let t = player.currentTime + offset
+        let line = lines.lastIndex { $0.time <= t } ?? -1
+        Color.clear.onChange(of: line, initial: true) { _, new in active = new }
     }
 }
 

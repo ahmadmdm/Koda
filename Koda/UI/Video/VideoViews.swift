@@ -118,6 +118,7 @@ struct VideoHomeView: View {
     @Environment(AccountModel.self) private var account
     @State private var topic = VideoTopic.all[0]
     @State private var videos: [Video] = []
+    @State private var loadStamp: LoadStamp?
     @State private var loading = false
     @State private var error: String?
 
@@ -158,7 +159,13 @@ struct VideoHomeView: View {
         .toolbarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
         .refreshable { await load() }
-        .task(id: "\(topic.id)|\(account.active?.id.uuidString ?? "")") { await load() }
+        .task(id: "\(topic.id)|\(account.active?.id.uuidString ?? "")") {
+            // Back on Home after a channel or playlist: keep the feed (up to four requests) while it is fresh.
+            let key = "\(topic.id)|\(account.active?.id.uuidString ?? "")"
+            guard loadStamp?.isFresh(for: key) != true else { return }
+            await load()
+            if !Task.isCancelled, error == nil { loadStamp = LoadStamp(key: key) }
+        }
     }
 
     private func load() async {
@@ -405,6 +412,7 @@ struct SubscriptionsView: View {
     @State private var feed: [Video] = []
     @State private var loading = false
     @State private var loaded = false
+    @State private var loadStamp: LoadStamp?
     @State private var channelFilter: String?
     @State private var maxAgeDays = 0
 
@@ -461,7 +469,13 @@ struct SubscriptionsView: View {
             }
         }
         .refreshable { await load() }
-        .task(id: "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")") { await load() }
+        .task(id: "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")") {
+            // One RSS request per followed channel: don't send them all again on every return to this tab.
+            let key = "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")"
+            guard loadStamp?.isFresh(for: key) != true else { return }
+            await load()
+            if !Task.isCancelled, !feed.isEmpty { loadStamp = LoadStamp(key: key) }
+        }
     }
 
     private var hasFollows: Bool { !library.data.subscriptions.isEmpty || account.isSignedIn }

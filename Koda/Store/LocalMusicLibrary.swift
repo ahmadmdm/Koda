@@ -112,6 +112,7 @@ final class LocalMusicLibrary {
         let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]
         let files = (try? fm.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])) ?? []
         var next: [String: Entry] = [:]
+        var changed = false
         for file in files where Self.fileExtensions.contains(file.pathExtension.lowercased()) {
             let values = try? file.resourceValues(forKeys: Set(keys))
             guard values?.isRegularFile != false else { continue }
@@ -124,11 +125,16 @@ final class LocalMusicLibrary {
                 try? fm.removeItem(at: Self.artworkDirectory.appendingPathComponent(Self.artworkName(name)))
                 let song = await Self.readSong(at: file)
                 next[name] = Entry(song: song, size: size, modified: modified)
+                changed = true
             }
         }
         for gone in Set(index.keys).subtracting(next.keys) {
             try? fm.removeItem(at: Self.artworkDirectory.appendingPathComponent(Self.artworkName(gone)))
+            changed = true
         }
+        // The usual launch: the folder is as it was. Leave `songs` (and the screens and CarPlay lists
+        // watching it) and the index file alone.
+        guard changed else { return }
         index = next
         songs = Self.sorted(next.values.map(\.song))
         save()

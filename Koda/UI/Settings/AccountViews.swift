@@ -17,13 +17,25 @@ final class AccountModel {
         NotificationCenter.default.addObserver(forName: AccountSession.didChange, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { AccountModel.shared.reload() }
         }
-        if active != nil { Task { await AccountAPI.refreshProfile(); await importSubscriptions() } }
+        if active != nil {
+            // Off the launch path: Home's own requests go first.
+            Task(priority: .utility) {
+                try? await Task.sleep(for: .seconds(3))
+                await AccountAPI.refreshProfile()
+                await importSubscriptions()
+            }
+        }
     }
 
     func reload() {
         let previous = active?.id
-        accounts = AccountSession.shared.all
-        active = AccountSession.shared.active
+        // Google rotates session cookies on many responses, and each rotation posts a change. No view
+        // shows cookies: assign only when something else differs, so the screens reading the account
+        // (Home among them) don't redraw after every signed-in request.
+        let all = AccountSession.shared.all, current = AccountSession.shared.active
+        func shown(_ a: YouTubeAccount?) -> YouTubeAccount? { a.map { var a = $0; a.cookies = ""; return a } }
+        if all.map(shown) != accounts.map(shown) { accounts = all }
+        if shown(current) != shown(active) { active = current }
         if let id = active?.id, id != previous { Task { await importSubscriptions() } }
     }
 
@@ -33,7 +45,9 @@ final class AccountModel {
         guard let channels = try? await AccountAPI.subscribedChannels(), !channels.isEmpty else { return }
         let library = LibraryStore.shared
         let known = Set(library.data.subscriptions.map(\.id))
-        library.data.subscriptions += channels.filter { !known.contains($0.id) }
+        let added = channels.filter { !known.contains($0.id) }
+        // Usually nothing is new: leave the library (and its save and redraw) alone then.
+        if !added.isEmpty { library.data.subscriptions += added }
     }
 
     var isSignedIn: Bool { active != nil }

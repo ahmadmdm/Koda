@@ -73,9 +73,16 @@ nonisolated final class InnerTube: Sendable {
     ///   account's cookies and SAPISIDHASH for this origin. Stream resolution never passes it: the
     ///   native player clients answer a signed request with HTTP 400.
     private func post(_ url: String, body: [String: Any], signedInOrigin: String? = nil, headers: [String: String]) async throws -> J {
+        try await send(url, body: try JSONSerialization.data(withJSONObject: body), signedInOrigin: signedInOrigin, headers: headers)
+    }
+
+    /// `@concurrent`, like the API calls built on it: with approachable concurrency a plain
+    /// nonisolated async function runs on its caller's actor, which for views is the main thread, and
+    /// parsing a megabyte of JSON (and signing, and the Keychain write of rotated cookies) there drops frames.
+    @concurrent private func send(_ url: String, body: Data, signedInOrigin: String?, headers: [String: String]) async throws -> J {
         var request = URLRequest(url: URL(string: url)!)
         request.httpMethod = "POST"
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         for (k, v) in headers { request.setValue(v, forHTTPHeaderField: k) }
         let account = signedInOrigin.flatMap { AccountSession.shared.authenticate(&request, origin: $0) }
@@ -172,7 +179,7 @@ nonisolated final class InnerTube: Sendable {
     /// unavailable"), then IOS and ANDROID_VR as the last resort. Only a reason every client
     /// agrees on (age, region, private) is reported.
     /// `quick` asks visionOS once, for probing alternates where a refusal is the expected answer.
-    func player(videoId: String, quick: Bool = false) async throws -> StreamInfo {
+    @concurrent func player(videoId: String, quick: Bool = false) async throws -> StreamInfo {
         let attempts: [(PlayerClient, Bool)] = quick ? [(Self.visionOS, false)] : [
             (Self.visionOS, false), (Self.visionOS, true), (Self.iOSClient, false), (Self.androidVR, false),
         ]

@@ -269,8 +269,10 @@ struct WatchView: View {
         }
         if let related = model.details?.related, !related.isEmpty {
             Text("Related").font(.headline)
-            ForEach(library.filtered(related).filter { $0.id != model.autoNext?.id }) { v in
-                VideoCard(video: v, compact: true, queue: library.filtered(related))
+            // Filtered once, not again for every card.
+            let visible = library.filtered(related)
+            ForEach(visible.filter { $0.id != model.autoNext?.id }) { v in
+                VideoCard(video: v, compact: true, queue: visible)
             }
         }
     }
