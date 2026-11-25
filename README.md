@@ -73,10 +73,18 @@ and opening `youtube.com`, `youtu.be`, `music.youtube.com` and `koda://` links.
   Up next. Lock Screen sizes: rectangular, circular and inline. The app shares state with the widget through the App Group
   `group.com.koda.ios` (`Shared/`).
 - **Control Center**: a play/pause control (`ControlWidget`).
-- **CarPlay** (`Koda/CarPlay/`): an audio app with Home (Speed dial, Quick picks, liked songs), Library (liked songs,
-  downloads, playlists, saved albums and artists), History and Explore tabs. The Now Playing screen adds shuffle, like,
-  radio, speed and repeat buttons, the Up Next queue, and opens the album or artist from the playing song. On a real device
-  the `com.apple.developer.carplay-audio` entitlement has to be approved by Apple first.
+- **CarPlay** (`Koda/CarPlay/`): an audio app with four tabs. Home: Continue listening (resumes the last song where it
+  stopped), For the Drive mixes built on the phone (Drive Mix, a Morning/Afternoon/Evening/Late Night mix from what you
+  play at that hour, Fresh Finds without anything already played, artist mixes from your taste artists, and an Offline
+  Mix of downloads and songs on the iPhone), Your artists, Speed dial, Quick picks and liked songs. Library (liked
+  songs, downloads, On this iPhone, playlists, saved albums and artists), History, and Explore (YouTube Music's Moods &
+  genres, Commute first, then its Home shelves). Pages load with a "Loading…" row, and offline show "Try again" and
+  "Play your downloads". The Now Playing screen has shuffle, like, radio, a speed button that shows the speed, and a
+  sheet with the sleep timer and repeat; plus Up Next and the album or artist of the song. On a real device the
+  `com.apple.developer.carplay-audio` entitlement has to be approved by Apple first.
+- **Siri** (`KodaPlayMediaHandler`): "Hey Siri, play <song, artist, album or playlist> on Koda", in the car too, through
+  `INPlayMediaIntent` handled in the app (`application(_:handlerFor:)`). It needs the Siri capability
+  (`com.apple.developer.siri`, already in `KodaCarPlay.entitlements`) on the App ID.
 
 ## Video audio tracks and subtitles
 

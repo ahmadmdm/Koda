@@ -38,6 +38,16 @@
 			</array>
 		</dict>
 	</dict>
+	<key>NSSiriUsageDescription</key>
+	<string>Siri can play songs, artists, albums and playlists in Koda, also in the car.</string>
+	<key>INIntentsSupported</key>
+	<array>
+		<string>INPlayMediaIntent</string>
+	</array>
+	<key>INSupportedMediaCategories</key>
+	<array>
+		<string>INMediaCategoryMusic</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
