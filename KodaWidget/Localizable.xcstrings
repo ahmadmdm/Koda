@@ -17,7 +17,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "كودا"
+            "value": "A!"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A!"
           }
         }
       }
@@ -67,7 +73,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "افتح كودا لبدء الموسيقى."
+            "value": "افتح A! لبدء الموسيقى."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open A! to start the music."
           }
         }
       }
@@ -87,7 +99,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل كودا أو يوقفه مؤقتًا."
+            "value": "يشغّل A! أو يوقفه مؤقتًا."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays or pauses A!."
           }
         }
       }
@@ -97,7 +115,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل الأغنية الحالية في كودا أو يوقفها مؤقتًا."
+            "value": "يشغّل الأغنية الحالية في A! أو يوقفها مؤقتًا."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays or pauses the current song in A!."
           }
         }
       }
@@ -117,7 +141,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الأغنية قيد التشغيل في كودا، مع أزرار التحكم وما يليها."
+            "value": "الأغنية قيد التشغيل في A!، مع أزرار التحكم وما يليها."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The song playing in A!, with controls and what comes next."
           }
         }
       }

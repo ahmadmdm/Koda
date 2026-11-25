@@ -1349,7 +1349,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "اختر العربية أو الإنجليزية لكودا من تطبيق الإعدادات في iOS؛ يتبع التخطيط اللغة، من اليمين إلى اليسار للعربية."
+            "value": "اختر العربية أو الإنجليزية لA! من تطبيق الإعدادات في iOS؛ يتبع التخطيط اللغة، من اليمين إلى اليسار للعربية."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Arabic or English for A! in the iOS Settings app; the layout follows the language, right to left for Arabic."
           }
         }
       }
@@ -2195,7 +2201,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "استورد ملفات MP3 أو M4A أو AAC أو WAV أو FLAC أو AIFF، أو انسخها إلى مجلد كودا › Music عبر تطبيق الملفات أو Finder."
+            "value": "استورد ملفات MP3 أو M4A أو AAC أو WAV أو FLAC أو AIFF، أو انسخها إلى مجلد A! › Music عبر تطبيق الملفات أو Finder."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import MP3, M4A, AAC, WAV, FLAC or AIFF files, or copy them into the A! › Music folder with the Files app or Finder."
           }
         }
       }
@@ -2225,7 +2237,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "كودا"
+            "value": "A!"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A!"
           }
         }
       }
@@ -2235,7 +2253,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "ملخص كودا • %@"
+            "value": "ملخص A! • %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A! Recap • %@"
           }
         }
       }
@@ -2245,7 +2269,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "كودا غير تابع ليوتيوب أو جوجل. يجلب البث مباشرة من يوتيوب دون مفتاح API."
+            "value": "A! غير تابع ليوتيوب أو جوجل. يجلب البث مباشرة من يوتيوب دون مفتاح API."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A! is not affiliated with YouTube or Google. Streams are fetched directly from YouTube without an API key."
           }
         }
       }
@@ -2265,7 +2295,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يسجّل كودا ما تسمعه باستخدام حساب Last.fm API الخاص بك. أنشئ واحدًا من last.fm/api/account/create (أي اسم للتطبيق، واترك رابط الرجوع فارغًا)، ثم الصق مفتاح API والسر المشترك هنا. تُرسَل كلمة المرور إلى Last.fm فقط عبر HTTPS لبدء الجلسة ولا تُحفظ أبدًا؛ وتبقى الجلسة والمفتاح والسر في سلسلة المفاتيح على هذا الآيفون. تُسجَّل الأغنية بعد نصف مدتها أو 4 دقائق، وتُتجاهل الأغاني التي مدتها 30 ثانية أو أقل."
+            "value": "يسجّل A! ما تسمعه باستخدام حساب Last.fm API الخاص بك. أنشئ واحدًا من last.fm/api/account/create (أي اسم للتطبيق، واترك رابط الرجوع فارغًا)، ثم الصق مفتاح API والسر المشترك هنا. تُرسَل كلمة المرور إلى Last.fm فقط عبر HTTPS لبدء الجلسة ولا تُحفظ أبدًا؛ وتبقى الجلسة والمفتاح والسر في سلسلة المفاتيح على هذا الآيفون. تُسجَّل الأغنية بعد نصف مدتها أو 4 دقائق، وتُتجاهل الأغاني التي مدتها 30 ثانية أو أقل."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A! scrobbles with your own Last.fm API account. Create one at last.fm/api/account/create (any application name; leave the callback URL empty), then paste its API key and shared secret here. Your password is sent only to Last.fm over HTTPS to start a session and is never stored; the session, key and secret stay in the Keychain on this iPhone. Songs are scrobbled after half their length or 4 minutes; songs of 30 seconds or less are skipped."
           }
         }
       }
@@ -2705,7 +2741,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "ملخصي في كودا"
+            "value": "ملخصي في A!"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My A! Recap"
           }
         }
       }
@@ -2995,7 +3037,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "لا شيء قيد التشغيل في كودا."
+            "value": "لا شيء قيد التشغيل في A!."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing is playing in A!."
           }
         }
       }
@@ -3115,7 +3163,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "افتح كودا لبدء الموسيقى."
+            "value": "افتح A! لبدء الموسيقى."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open A! to start the music."
           }
         }
       }
@@ -3125,7 +3179,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يفتح البحث في كودا بكلماتك."
+            "value": "يفتح البحث في A! بكلماتك."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens A!'s search with your words."
           }
         }
       }
@@ -3205,7 +3265,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "اختر بعض الفنانين وسيصمم كودا اقتراحاتك على ذوقك."
+            "value": "اختر بعض الفنانين وسيصمم A! اقتراحاتك على ذوقك."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pick a few artists and A! will shape your recommendations."
           }
         }
       }
@@ -3275,7 +3341,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "شغّل أغنية في كودا أولًا، ثم ابدأ راديو منها."
+            "value": "شغّل أغنية في A! أولًا، ثم ابدأ راديو منها."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play a song in A! first, then start a radio from it."
           }
         }
       }
@@ -3455,7 +3527,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل إحدى قوائم تشغيلك في كودا."
+            "value": "يشغّل إحدى قوائم تشغيلك في A!."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays one of your A! playlists."
           }
         }
       }
@@ -3465,7 +3543,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل كودا أو يوقفه مؤقتًا."
+            "value": "يشغّل A! أو يوقفه مؤقتًا."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays or pauses A!."
           }
         }
       }
@@ -3475,7 +3559,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل الأغنية الحالية في كودا أو يوقفها مؤقتًا."
+            "value": "يشغّل الأغنية الحالية في A! أو يوقفها مؤقتًا."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays or pauses the current song in A!."
           }
         }
       }
@@ -3485,7 +3575,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل الأغاني التي أعجبتك في كودا."
+            "value": "يشغّل الأغاني التي أعجبتك في A!."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays the songs you liked in A!."
           }
         }
       }
@@ -3915,7 +4011,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "البحث في كودا"
+            "value": "البحث في A!"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search A!"
           }
         }
       }
@@ -3925,7 +4027,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "البحث في كودا عن ${text}"
+            "value": "البحث في A! عن ${text}"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search A! for ${text}"
           }
         }
       }
@@ -4115,7 +4223,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يشغّل أغانيك المعجب بها وقوائم تشغيلك وتنزيلاتك في كودا بترتيب عشوائي."
+            "value": "يشغّل أغانيك المعجب بها وقوائم تشغيلك وتنزيلاتك في A! بترتيب عشوائي."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffles your liked songs, playlists and downloads in A!."
           }
         }
       }
@@ -4595,7 +4709,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يخبرك بالأغنية قيد التشغيل في كودا."
+            "value": "يخبرك بالأغنية قيد التشغيل في A!."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tells you the song playing in A!."
           }
         }
       }
@@ -4625,7 +4745,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "الأغنية قيد التشغيل في كودا، مع أزرار التحكم وما يليها."
+            "value": "الأغنية قيد التشغيل في A!، مع أزرار التحكم وما يليها."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The song playing in A!, with controls and what comes next."
           }
         }
       }
@@ -4985,7 +5111,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "أهلًا بك في كودا"
+            "value": "أهلًا بك في A!"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Welcome to A!"
           }
         }
       }
@@ -5045,7 +5177,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "لم تُعجب بأي أغنية في كودا بعد."
+            "value": "لم تُعجب بأي أغنية في A! بعد."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You haven't liked any songs in A! yet."
           }
         }
       }
@@ -5085,7 +5223,13 @@
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "مكتبتك في كودا فارغة."
+            "value": "مكتبتك في A! فارغة."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your A! library is empty."
           }
         }
       }

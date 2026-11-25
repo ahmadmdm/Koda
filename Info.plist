@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleSpokenName</key>
+	<string>A</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -13,12 +15,20 @@
 			</array>
 		</dict>
 	</array>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
-	<key>UIFileSharingEnabled</key>
-	<true/>
+	<key>INIntentsSupported</key>
+	<array>
+		<string>INPlayMediaIntent</string>
+	</array>
+	<key>INSupportedMediaCategories</key>
+	<array>
+		<string>INMediaCategoryMusic</string>
+	</array>
 	<key>KodaAppGroup</key>
 	<string>group.$(KODA_ID_PREFIX)</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>NSSiriUsageDescription</key>
+	<string>Siri can play songs, artists, albums and playlists in A!, also in the car.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
@@ -38,19 +48,11 @@
 			</array>
 		</dict>
 	</dict>
-	<key>NSSiriUsageDescription</key>
-	<string>Siri can play songs, artists, albums and playlists in Koda, also in the car.</string>
-	<key>INIntentsSupported</key>
-	<array>
-		<string>INPlayMediaIntent</string>
-	</array>
-	<key>INSupportedMediaCategories</key>
-	<array>
-		<string>INMediaCategoryMusic</string>
-	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 </dict>
 </plist>

@@ -164,7 +164,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Koda;
+				INFOPLIST_KEY_CFBundleDisplayName = "A!";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Koda uses the microphone for voice search.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Koda turns your voice into a search.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
@@ -194,7 +194,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Koda;
+				INFOPLIST_KEY_CFBundleDisplayName = "A!";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Koda uses the microphone for voice search.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Koda turns your voice into a search.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO;
@@ -222,7 +222,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KodaWidgetInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Koda;
+				INFOPLIST_KEY_CFBundleDisplayName = "A!";
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks");
 				MARKETING_VERSION = 5.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(KODA_ID_PREFIX).widget";
@@ -245,7 +245,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = KodaWidgetInfo.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Koda;
+				INFOPLIST_KEY_CFBundleDisplayName = "A!";
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks");
 				MARKETING_VERSION = 5.4;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(KODA_ID_PREFIX).widget";
