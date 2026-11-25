@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import Observation
 
@@ -14,6 +15,16 @@ final class AppState {
     var showPlayer = false
     var addToPlaylist: [Song]?
     var toast: String?
+    /// A search asked for from outside the view, for example by Siri; the search tab runs it.
+    var searchRequest: String?
+
+    /// The app's state, for App Intents running in the app's process.
+    private(set) static weak var current: AppState?
+
+    init() {
+        Self.current = self
+        KodaShortcuts.updateAppShortcutParameters()
+    }
 
     func path(_ tab: AppTab) -> Binding<NavigationPath> {
         Binding(get: { self.paths[tab] ?? NavigationPath() }, set: { self.paths[tab] = $0 })
@@ -24,6 +35,15 @@ final class AppState {
         VideoPlayerModel.shared.isPresented = false
         if tab == .settings { tab = .home }
         paths[tab, default: NavigationPath()].append(route)
+    }
+
+    func search(_ text: String) {
+        showPlayer = false
+        VideoPlayerModel.shared.isPresented = false
+        mode = .music
+        tab = .search
+        paths[.search] = NavigationPath()
+        searchRequest = text
     }
 
     func showToast(_ key: String.LocalizationValue) {

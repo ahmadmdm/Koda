@@ -14,6 +14,7 @@ enum WidgetSync {
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
             write(player)
+            LiveActivitySync.update(player)
         }
     }
 
@@ -47,6 +48,7 @@ enum WidgetSync {
             image.draw(in: CGRect(x: (side - size.width) / 2, y: (side - size.height) / 2, width: size.width, height: size.height))
         }
         try? scaled.jpegData(compressionQuality: 0.85)?.write(to: url, options: .atomic)
+        LiveActivitySync.artworkSaved(songId: songId)
         lastKey = ""
         WidgetCenter.shared.reloadAllTimelines()
     }

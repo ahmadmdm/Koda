@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("palette") private var palette = Palette.violet.rawValue
     @AppStorage("playerStyle") private var playerStyle = PlayerStyle.classic.rawValue
     @AppStorage("ambientBackground") private var ambient = true
+    @AppStorage(LiveActivitySync.enabledKey) private var liveActivity = true
     @AppStorage("homeLayout") private var homeLayout = "mix"
     @AppStorage("musicQuality") private var musicQuality = "high"
     @AppStorage("downloadQuality") private var downloadQuality = "high"
@@ -72,12 +73,14 @@ struct SettingsView: View {
                     }
                 }
             }
-            if matches("player style ambient background") {
+            if matches("player style ambient background live activity dynamic island lock screen") {
                 Section("Player") {
                     Picker("Player style", selection: $playerStyle) {
                         ForEach(PlayerStyle.allCases) { Label($0.title, systemImage: $0.icon).tag($0.rawValue) }
                     }
                     Toggle("Ambient artwork background", isOn: $ambient)
+                    Toggle("Live Activity", isOn: $liveActivity)
+                        .onChange(of: liveActivity) { LiveActivitySync.update(MusicPlayer.shared) }
                 }
             }
             if matches("playback quality normalise normalize volume preload stream download") {

@@ -4,6 +4,7 @@ import Speech
 struct MusicSearchView: View {
     @Environment(MusicPlayer.self) private var player
     @Environment(LibraryStore.self) private var library
+    @Environment(AppState.self) private var app
     @State private var query = ""
     @State private var submitted = ""
     @State private var filter: MusicSearchFilter = .songs
@@ -72,6 +73,11 @@ struct MusicSearchView: View {
             }
         }
         .onChange(of: filter) { Task { await search() } }
+        .onChange(of: app.searchRequest, initial: true) { _, request in
+            guard let request else { return }
+            app.searchRequest = nil
+            submit(request)
+        }
         .onChange(of: voice.transcript) { _, t in if !t.isEmpty { query = t } }
         .onChange(of: voice.isRecording) { _, rec in if !rec, !voice.transcript.isEmpty { submit(voice.transcript) } }
         .toolbar {

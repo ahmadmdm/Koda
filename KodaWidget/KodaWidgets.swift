@@ -6,6 +6,7 @@ import WidgetKit
 struct KodaWidgetBundle: WidgetBundle {
     var body: some Widget {
         NowPlayingWidget()
+        NowPlayingLiveActivity()
         PlayPauseControl()
     }
 }
