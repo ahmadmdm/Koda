@@ -194,7 +194,33 @@ nonisolated final class InnerTube: Sendable {
                 lastError = error
             }
         }
+        if case InnerTubeError.unplayable(let reason) = lastError, let hint = await connectionCountryHint() {
+            throw InnerTubeError.unplayable(reason + "\n" + hint)
+        }
         throw lastError
+    }
+
+    /// The country YouTube places this connection in, from the visitorData it minted for it
+    /// (field 1 of its location message, e.g. `0a 02 53 41` = "SA").
+    func connectionCountry() async -> String? {
+        let vd = await visitorData()
+        guard let decoded = vd.removingPercentEncoding,
+              let data = Data(base64Encoded: decoded.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+                .padding(toLength: (decoded.count + 3) / 4 * 4, withPad: "=", startingAt: 0)) else { return nil }
+        let bytes = [UInt8](data)
+        for i in stride(from: bytes.count - 4, through: 0, by: -1) where bytes[i] == 0x0A && bytes[i + 1] == 0x02 {
+            let code = String(decoding: bytes[(i + 2)...(i + 3)], as: UTF8.self)
+            if code.allSatisfy({ $0.isASCII && $0.isUppercase }) { return code }
+        }
+        return nil
+    }
+
+    /// When a video is refused and YouTube sees the connection in another country than the
+    /// iPhone's region, a VPN is the usual cause: say so instead of only "unavailable".
+    private func connectionCountryHint() async -> String? {
+        guard let country = await connectionCountry(), country != region else { return nil }
+        let name = Locale.current.localizedString(forRegionCode: country) ?? country
+        return String(localized: "YouTube sees your connection as coming from \(name), where this may be blocked. If you use a VPN, turn it off or pick another country.")
     }
 
     private func player(videoId: String, client: PlayerClient, visitorData vd: String) async throws -> J {

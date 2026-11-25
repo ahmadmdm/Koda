@@ -5259,6 +5259,16 @@
           }
         }
       }
+    },
+    "YouTube sees your connection as coming from %@, where this may be blocked. If you use a VPN, turn it off or pick another country.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يرى يوتيوب أن اتصالك قادم من %@، وقد يكون هذا المحتوى محجوبًا هناك. إذا كنت تستخدم VPN فأوقفه أو اختر دولة أخرى."
+          }
+        }
+      }
     }
   }
 }
