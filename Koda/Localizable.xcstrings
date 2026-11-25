@@ -2,6 +2,16 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "%@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@"
+          }
+        }
+      }
+    },
     "%@ (Dubbed)": {
       "localizations": {
         "ar": {
@@ -28,6 +38,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ (مُنشأة تلقائيًا)"
+          }
+        }
+      }
+    },
+    "%@ by %@ is paused.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ لـ %@ متوقفة مؤقتًا."
           }
         }
       }
@@ -62,6 +82,46 @@
         }
       }
     },
+    "%lld crashes": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld أعطال"
+          }
+        }
+      }
+    },
+    "%lld files imported": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم استيراد %lld ملفات"
+          }
+        }
+      }
+    },
+    "%lld files • %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld ملفات • %@"
+          }
+        }
+      }
+    },
+    "%lld hangs": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld تجمّد"
+          }
+        }
+      }
+    },
     "%lld min listened": {
       "localizations": {
         "ar": {
@@ -78,6 +138,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld دقيقة"
+          }
+        }
+      }
+    },
+    "%lld other": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld أخرى"
           }
         }
       }
@@ -152,12 +222,32 @@
         }
       }
     },
+    "1 file imported": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم استيراد ملف واحد"
+          }
+        }
+      }
+    },
     "A music and video player powered by YouTube. No account or API key needed — your library, likes and statistics stay on this iPhone.": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "مشغل موسيقى وفيديو يعمل بيوتيوب. لا حاجة إلى حساب أو مفتاح API — مكتبتك وإعجاباتك وإحصائياتك تبقى على هذا الآيفون."
+          }
+        }
+      }
+    },
+    "API key": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مفتاح API"
           }
         }
       }
@@ -248,6 +338,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "إضافة إلى قائمة الانتظار"
+          }
+        }
+      }
+    },
+    "Adjust…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ضبط…"
           }
         }
       }
@@ -512,6 +612,16 @@
         }
       }
     },
+    "Brightness": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السطوع"
+          }
+        }
+      }
+    },
     "Can't decide? Let the wheel pick a song.": {
       "localizations": {
         "ar": {
@@ -572,12 +682,32 @@
         }
       }
     },
+    "Chat replay": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إعادة المحادثة"
+          }
+        }
+      }
+    },
     "Choose Arabic or English for Koda in the iOS Settings app; the layout follows the language, right to left for Arabic.": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "اختر العربية أو الإنجليزية لكودا من تطبيق الإعدادات في iOS؛ يتبع التخطيط اللغة، من اليمين إلى اليسار للعربية."
+          }
+        }
+      }
+    },
+    "Cinema": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "سينمائي"
           }
         }
       }
@@ -628,6 +758,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "مسح سجل الاستماع والمشاهدة"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إغلاق"
+          }
+        }
+      }
+    },
+    "Close chat": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إغلاق المحادثة"
           }
         }
       }
@@ -698,6 +848,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "متابعة مع %lld"
+          }
+        }
+      }
+    },
+    "Contrast": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التباين"
+          }
+        }
+      }
+    },
+    "Cool": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بارد"
           }
         }
       }
@@ -812,12 +982,32 @@
         }
       }
     },
+    "Diagnostics": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التشخيص"
+          }
+        }
+      }
+    },
     "Dial": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "قرص"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم"
           }
         }
       }
@@ -968,6 +1158,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "تصدير CSV"
+          }
+        }
+      }
+    },
+    "Export report": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تصدير التقرير"
           }
         }
       }
@@ -1252,12 +1452,42 @@
         }
       }
     },
+    "Import": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استيراد"
+          }
+        }
+      }
+    },
     "Import CSV…": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "استيراد CSV…"
+          }
+        }
+      }
+    },
+    "Import MP3, M4A, AAC, WAV, FLAC or AIFF files, or copy them into the Koda › Music folder with the Files app or Finder.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استورد ملفات MP3 أو M4A أو AAC أو WAV أو FLAC أو AIFF، أو انسخها إلى مجلد كودا › Music عبر تطبيق الملفات أو Finder."
+          }
+        }
+      }
+    },
+    "Import audio files…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "استيراد ملفات صوتية…"
           }
         }
       }
@@ -1312,6 +1542,16 @@
         }
       }
     },
+    "Koda scrobbles with your own Last.fm API account. Create one at last.fm/api/account/create (any application name; leave the callback URL empty), then paste its API key and shared secret here. Your password is sent only to Last.fm over HTTPS to start a session and is never stored; the session, key and secret stay in the Keychain on this iPhone. Songs are scrobbled after half their length or 4 minutes; songs of 30 seconds or less are skipped.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يسجّل كودا ما تسمعه باستخدام حساب Last.fm API الخاص بك. أنشئ واحدًا من last.fm/api/account/create (أي اسم للتطبيق، واترك رابط الرجوع فارغًا)، ثم الصق مفتاح API والسر المشترك هنا. تُرسَل كلمة المرور إلى Last.fm فقط عبر HTTPS لبدء الجلسة ولا تُحفظ أبدًا؛ وتبقى الجلسة والمفتاح والسر في سلسلة المفاتيح على هذا الآيفون. تُسجَّل الأغنية بعد نصف مدتها أو 4 دقائق، وتُتجاهل الأغاني التي مدتها 30 ثانية أو أقل."
+          }
+        }
+      }
+    },
     "LIVE": {
       "localizations": {
         "ar": {
@@ -1352,12 +1592,62 @@
         }
       }
     },
+    "Last.fm": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last.fm"
+          }
+        }
+      }
+    },
+    "Last.fm ended the session. Sign in again.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أنهى Last.fm الجلسة. سجّل الدخول مرة أخرى."
+          }
+        }
+      }
+    },
+    "Last.fm sent an unexpected response.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أرسل Last.fm ردًا غير متوقع."
+          }
+        }
+      }
+    },
+    "Last.fm username": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اسم مستخدم Last.fm"
+          }
+        }
+      }
+    },
     "Later 0.5s": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "أبطأ 0.5 ث"
+          }
+        }
+      }
+    },
+    "Latest": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الأحدث"
           }
         }
       }
@@ -1422,6 +1712,16 @@
         }
       }
     },
+    "Liked Songs": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الأغاني المعجب بها"
+          }
+        }
+      }
+    },
     "Liked music": {
       "localizations": {
         "ar": {
@@ -1478,6 +1778,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "مباشر"
+          }
+        }
+      }
+    },
+    "Live Activity": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "النشاط المباشر"
+          }
+        }
+      }
+    },
+    "Live chat": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المحادثة المباشرة"
           }
         }
       }
@@ -1582,6 +1902,16 @@
         }
       }
     },
+    "Mono": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "أبيض وأسود"
+          }
+        }
+      }
+    },
     "Music": {
       "localizations": {
         "ar": {
@@ -1592,12 +1922,32 @@
         }
       }
     },
+    "Music files": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ملفات الموسيقى"
+          }
+        }
+      }
+    },
     "Music playback": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "تشغيل الموسيقى"
+          }
+        }
+      }
+    },
+    "Mute": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كتم الصوت"
           }
         }
       }
@@ -1692,12 +2042,32 @@
         }
       }
     },
+    "Night": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ليلي"
+          }
+        }
+      }
+    },
     "No artists": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "لا يوجد فنانون"
+          }
+        }
+      }
+    },
+    "No chat at this point": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا توجد محادثة عند هذه النقطة"
           }
         }
       }
@@ -1742,6 +2112,16 @@
         }
       }
     },
+    "No music files": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا توجد ملفات موسيقى"
+          }
+        }
+      }
+    },
     "No plays yet": {
       "localizations": {
         "ar": {
@@ -1758,6 +2138,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "لا يوجد مزوّد لديه كلمات هذه الأغنية بعد."
+          }
+        }
+      }
+    },
+    "No reports": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا توجد تقارير"
           }
         }
       }
@@ -1808,6 +2198,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "لا شيء هنا بعد"
+          }
+        }
+      }
+    },
+    "Nothing is playing in Koda.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا شيء قيد التشغيل في كودا."
           }
         }
       }
@@ -1882,6 +2282,16 @@
         }
       }
     },
+    "On this iPhone": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "على هذا الآيفون"
+          }
+        }
+      }
+    },
     "One ring for each day, in the colours of your covers.": {
       "localizations": {
         "ar": {
@@ -1902,6 +2312,16 @@
         }
       }
     },
+    "Opens Koda's search with your words.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يفتح البحث في كودا بكلماتك."
+          }
+        }
+      }
+    },
     "Optional. Signing in adds your YouTube and YouTube Music home, library, liked songs, subscriptions and history, and syncs likes, saves and subscriptions back to YouTube. Without an account everything else keeps working on this iPhone.": {
       "localizations": {
         "ar": {
@@ -1918,6 +2338,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "التشغيل من"
+          }
+        }
+      }
+    },
+    "Panel": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اللوحة"
+          }
+        }
+      }
+    },
+    "Password": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "كلمة المرور"
           }
         }
       }
@@ -1952,6 +2392,16 @@
         }
       }
     },
+    "Picture": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الصورة"
+          }
+        }
+      }
+    },
     "Play": {
       "localizations": {
         "ar": {
@@ -1962,12 +2412,52 @@
         }
       }
     },
+    "Play ${playlist}": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل ${playlist}"
+          }
+        }
+      }
+    },
+    "Play Liked Songs": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل الأغاني المعجب بها"
+          }
+        }
+      }
+    },
     "Play Next": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "تشغيل التالي"
+          }
+        }
+      }
+    },
+    "Play Playlist": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل قائمة تشغيل"
+          }
+        }
+      }
+    },
+    "Play a song in Koda first, then start a radio from it.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "شغّل أغنية في كودا أولًا، ثم ابدأ راديو منها."
           }
         }
       }
@@ -2092,6 +2582,26 @@
         }
       }
     },
+    "Playing %@ by %@.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يتم تشغيل %@ لـ %@."
+          }
+        }
+      }
+    },
+    "Playlist": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قائمة التشغيل"
+          }
+        }
+      }
+    },
     "Playlist deleted": {
       "localizations": {
         "ar": {
@@ -2122,6 +2632,16 @@
         }
       }
     },
+    "Plays one of your Koda playlists.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يشغّل إحدى قوائم تشغيلك في كودا."
+          }
+        }
+      }
+    },
     "Plays or pauses Koda.": {
       "localizations": {
         "ar": {
@@ -2142,12 +2662,32 @@
         }
       }
     },
+    "Plays the songs you liked in Koda.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يشغّل الأغاني التي أعجبتك في كودا."
+          }
+        }
+      }
+    },
     "Preload upcoming songs": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "تحميل الأغاني القادمة مسبقًا"
+          }
+        }
+      }
+    },
+    "Preset": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "نمط جاهز"
           }
         }
       }
@@ -2272,6 +2812,26 @@
         }
       }
     },
+    "Remove": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إزالة"
+          }
+        }
+      }
+    },
+    "Remove API key and secret": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إزالة مفتاح API والسر"
+          }
+        }
+      }
+    },
     "Remove Download": {
       "localizations": {
         "ar": {
@@ -2312,6 +2872,16 @@
         }
       }
     },
+    "Remove the Last.fm API key?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إزالة مفتاح Last.fm API؟"
+          }
+        }
+      }
+    },
     "Rename": {
       "localizations": {
         "ar": {
@@ -2332,12 +2902,32 @@
         }
       }
     },
+    "Reports stay on this iPhone. Share one to send it with a bug report.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تبقى التقارير على هذا الآيفون. شارك أحدها لإرساله مع بلاغ عن مشكلة."
+          }
+        }
+      }
+    },
     "Reset (%@s)": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "إعادة ضبط (%@ ث)"
+          }
+        }
+      }
+    },
+    "Reset Picture": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إعادة ضبط الصورة"
           }
         }
       }
@@ -2392,6 +2982,16 @@
         }
       }
     },
+    "Saturation": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "التشبع"
+          }
+        }
+      }
+    },
     "Save": {
       "localizations": {
         "ar": {
@@ -2432,12 +3032,42 @@
         }
       }
     },
+    "Scrobble songs": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تسجيل الأغاني"
+          }
+        }
+      }
+    },
     "Search": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "بحث"
+          }
+        }
+      }
+    },
+    "Search Koda": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البحث في كودا"
+          }
+        }
+      }
+    },
+    "Search Koda for ${text}": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البحث في كودا عن ${text}"
           }
         }
       }
@@ -2462,6 +3092,16 @@
         }
       }
     },
+    "Search files": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "البحث في الملفات"
+          }
+        }
+      }
+    },
     "Search settings": {
       "localizations": {
         "ar": {
@@ -2478,6 +3118,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "ابحث في المقاطع المرفوعة"
+          }
+        }
+      }
+    },
+    "Send now": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إرسال الآن"
+          }
+        }
+      }
+    },
+    "Sepia": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بني قديم"
           }
         }
       }
@@ -2532,6 +3192,46 @@
         }
       }
     },
+    "Shared secret": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السر المشترك"
+          }
+        }
+      }
+    },
+    "Shared secret (saved)": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "السر المشترك (محفوظ)"
+          }
+        }
+      }
+    },
+    "Sharpen": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حِدّة"
+          }
+        }
+      }
+    },
+    "Shorts": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shorts"
+          }
+        }
+      }
+    },
     "Shuffle": {
       "localizations": {
         "ar": {
@@ -2542,12 +3242,42 @@
         }
       }
     },
+    "Shuffle Library": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تشغيل المكتبة عشوائيًا"
+          }
+        }
+      }
+    },
+    "Shuffles your liked songs, playlists and downloads in Koda.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يشغّل أغانيك المعجب بها وقوائم تشغيلك وتنزيلاتك في كودا بترتيب عشوائي."
+          }
+        }
+      }
+    },
     "Sign in again": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "تسجيل الدخول مرة أخرى"
+          }
+        }
+      }
+    },
+    "Sign in to Last.fm": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تسجيل الدخول إلى Last.fm"
           }
         }
       }
@@ -2582,12 +3312,32 @@
         }
       }
     },
+    "Sign out of Last.fm": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تسجيل الخروج من Last.fm"
+          }
+        }
+      }
+    },
     "Sign out of this account?": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "تسجيل الخروج من هذا الحساب؟"
+          }
+        }
+      }
+    },
+    "Signed in as": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مسجّل الدخول باسم"
           }
         }
       }
@@ -2782,6 +3532,16 @@
         }
       }
     },
+    "Starts a radio from the song playing, or the last one you played.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يبدأ راديو من الأغنية الحالية، أو آخر أغنية شغّلتها."
+          }
+        }
+      }
+    },
     "Statistics": {
       "localizations": {
         "ar": {
@@ -2952,6 +3712,26 @@
         }
       }
     },
+    "Tells you the song playing in Koda.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يخبرك بالأغنية قيد التشغيل في كودا."
+          }
+        }
+      }
+    },
+    "That playlist has no songs.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "قائمة التشغيل هذه لا تحتوي على أغانٍ."
+          }
+        }
+      }
+    },
     "The session is removed from this iPhone. Your playlists, likes and downloads on this iPhone stay.": {
       "localizations": {
         "ar": {
@@ -3112,6 +3892,16 @@
         }
       }
     },
+    "Unmute": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إلغاء كتم الصوت"
+          }
+        }
+      }
+    },
     "Up Next": {
       "localizations": {
         "ar": {
@@ -3222,6 +4012,46 @@
         }
       }
     },
+    "Vivid": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "زاهٍ"
+          }
+        }
+      }
+    },
+    "Waiting for messages…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "في انتظار الرسائل…"
+          }
+        }
+      }
+    },
+    "Waiting to send": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بانتظار الإرسال"
+          }
+        }
+      }
+    },
+    "Warm": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "دافئ"
+          }
+        }
+      }
+    },
     "Watch Later": {
       "localizations": {
         "ar": {
@@ -3242,12 +4072,52 @@
         }
       }
     },
+    "Watch in Player": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "المشاهدة في المشغّل"
+          }
+        }
+      }
+    },
     "Welcome to Koda": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
             "value": "أهلًا بك في كودا"
+          }
+        }
+      }
+    },
+    "What do you want to search for?": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "عمّ تريد أن تبحث؟"
+          }
+        }
+      }
+    },
+    "What's Playing": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ما الذي يُشغَّل"
+          }
+        }
+      }
+    },
+    "When iOS reports a crash or a hang, it appears here, usually a day later.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "عندما يبلّغ iOS عن عطل أو تجمّد، يظهر هنا عادةً بعد يوم."
           }
         }
       }
@@ -3268,6 +4138,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "لمن تستمع؟"
+          }
+        }
+      }
+    },
+    "You haven't liked any songs in Koda yet.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم تُعجب بأي أغنية في كودا بعد."
           }
         }
       }
@@ -3298,6 +4178,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "حساب يوتيوب"
+          }
+        }
+      }
+    },
+    "Your Koda library is empty.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مكتبتك في كودا فارغة."
           }
         }
       }
@@ -3408,6 +4298,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "أغنية"
+          }
+        }
+      }
+    },
+    "version %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإصدار %@"
           }
         }
       }
