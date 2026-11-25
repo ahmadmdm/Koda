@@ -31,7 +31,7 @@ final class DownloadManager {
     }
 
     func download(_ songs: [Song]) {
-        for song in songs where !isDownloaded(song.id) && active[song.id] == nil {
+        for song in songs where !song.isLocal && !isDownloaded(song.id) && active[song.id] == nil {
             active[song.id] = .queued
             pending.append(song)
             tasks[song.id] = Task { await self.run(song) }

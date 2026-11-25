@@ -105,6 +105,7 @@ final class MusicPlayer {
         }
         queue = list
         index = min(start, list.count - 1)
+        let radio = radio && !songs[startAt].isLocal
         radioSeed = radio ? songs[startAt].id : nil
         load(autoplay: true)
         if radio { Task { await extendWithRadio(seed: songs[startAt].id) } }
@@ -112,6 +113,7 @@ final class MusicPlayer {
     }
 
     func startRadio(from song: Song) {
+        guard !song.isLocal else { return }
         play([song], radio: true)
     }
 
@@ -319,6 +321,10 @@ final class MusicPlayer {
     }
 
     private func streamURL(for song: Song) async throws -> (URL, Double?) {
+        if song.isLocal {
+            guard let file = LocalMusicLibrary.fileURL(for: song.id) else { throw CocoaError(.fileNoSuchFile) }
+            return (file, nil)
+        }
         if let local = DownloadManager.shared.localURL(for: song.id) { return (local, nil) }
         if let cached = resolved[song.id], cached.expires > .now { return (cached.url, cached.loudness) }
         let info = try await InnerTube.shared.player(videoId: song.id)
@@ -349,7 +355,7 @@ final class MusicPlayer {
     }
 
     private func extendWithRadio(seed: String?, thenAdvance: Bool = false) async {
-        guard radioEnabled, let seed else { return }
+        guard radioEnabled, let seed, !seed.hasPrefix(LocalMusicLibrary.idPrefix) else { return }
         guard let songs = try? await MusicAPI.radio(for: seed) else { return }
         let existing = Set(queue.map(\.id))
         let fresh = songs.filter { !existing.contains($0.id) }
@@ -365,7 +371,7 @@ final class MusicPlayer {
         if repeatMode == .one { seek(to: 0); player.playImmediately(atRate: rate); return }
         if index + 1 >= queue.count, repeatMode != .all {
             Task { await extendWithRadio(seed: current?.id, thenAdvance: true) }
-            if !radioEnabled { isPlaying = false }
+            if !radioEnabled || current?.isLocal == true { isPlaying = false }
             return
         }
         next()

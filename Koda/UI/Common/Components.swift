@@ -187,7 +187,9 @@ struct SongMenuItems: View {
         Section {
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { player.playNext([song]) }
             Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { player.addToQueue([song]) }
-            Button("Start Radio", systemImage: "dot.radiowaves.left.and.right") { player.startRadio(from: song) }
+            if !song.isLocal {
+                Button("Start Radio", systemImage: "dot.radiowaves.left.and.right") { player.startRadio(from: song) }
+            }
         }
         Section {
             Button(library.isLiked(song) ? "Remove from Liked" : "Like", systemImage: library.isLiked(song) ? "heart.slash" : "heart") {
@@ -196,14 +198,16 @@ struct SongMenuItems: View {
             Button("Add to Playlist…", systemImage: "text.badge.plus") { app.addToPlaylist = [song] }
             if downloads.isDownloaded(song.id) {
                 Button("Remove Download", systemImage: "trash", role: .destructive) { downloads.delete(song.id) }
-            } else {
+            } else if !song.isLocal {
                 Button("Download", systemImage: "arrow.down.circle") { downloads.download([song]) }
             }
         }
         Section {
             if let artistId = song.artistId { Button("Go to Artist", systemImage: "music.microphone") { app.navigate(.artist(artistId)) } }
             if let albumId = song.albumId { Button("Go to Album", systemImage: "square.stack") { app.navigate(.album(albumId)) } }
-            ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(song.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
+            if !song.isLocal {
+                ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(song.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
+            }
         }
     }
 }

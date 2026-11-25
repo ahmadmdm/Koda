@@ -29,6 +29,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             if matches("account sign in google youtube login حساب تسجيل") { AccountSection() }
+            if matches("last.fm lastfm scrobble scrobbling") { LastFmSection() }
             if matches("language arabic english اللغة العربية") {
                 Section {
                     LabeledContent("App language", value: Locale.current.localizedString(forLanguageCode: Bundle.main.preferredLocalizations.first ?? "en") ?? "")

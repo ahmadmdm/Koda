@@ -193,27 +193,33 @@ nonisolated final class AccountSession: @unchecked Sendable {
     }
 }
 
-/// Minimal Keychain storage for the session list.
+/// Minimal Keychain storage: generic-password items, this device only, never in backups.
+/// With no arguments it reads and writes the YouTube session list, as before.
 nonisolated enum Keychain {
-    private static var query: [String: Any] { [
+    private static func query(service: String, account: String) -> [String: Any] { [
         kSecClass as String: kSecClassGenericPassword,
-        kSecAttrService as String: "com.koda.ios.youtube-session",
-        kSecAttrAccount as String: "accounts",
+        kSecAttrService as String: service,
+        kSecAttrAccount as String: account,
     ] }
 
-    static func read() -> Data? {
-        var q = query
+    static func read(service: String = "com.koda.ios.youtube-session", account: String = "accounts") -> Data? {
+        var q = query(service: service, account: account)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: AnyObject?
         return SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess ? out as? Data : nil
     }
 
-    static func write(_ data: Data) {
+    static func write(_ data: Data, service: String = "com.koda.ios.youtube-session", account: String = "accounts") {
+        let query = query(service: service, account: account)
         let attrs: [String: Any] = [kSecValueData as String: data,
                                     kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
         if SecItemUpdate(query as CFDictionary, attrs as CFDictionary) == errSecItemNotFound {
             SecItemAdd(query.merging(attrs) { $1 } as CFDictionary, nil)
         }
+    }
+
+    static func delete(service: String, account: String) {
+        SecItemDelete(query(service: service, account: account) as CFDictionary)
     }
 }
