@@ -119,7 +119,7 @@ struct VideoHomeView: View {
                 if loading && videos.isEmpty { LoadingView() }
                 if let error, videos.isEmpty { ErrorView(message: error) { Task { await load() } } }
                 let visible = library.filtered(videos)
-                ForEach(visible) { v in VideoCard(video: v, queue: visible).padding(.horizontal) }
+                VideoGrid(videos: visible)
             }
             .padding(.bottom, 24)
         }
@@ -217,6 +217,7 @@ struct VideoSearchView: View {
             }
         }
         .listStyle(.plain)
+        .readableContentWidth()
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Search YouTube")
         .onSubmit(of: .search) { submit(query) }
@@ -308,9 +309,7 @@ struct ChannelView: View {
                     Button { sortNewest.toggle() } label: { Label(sortNewest ? "Newest" : "Oldest", systemImage: "arrow.up.arrow.down") }.buttonStyle(.glass)
                 }
                 .padding(.horizontal)
-                LazyVStack(spacing: 20) {
-                    ForEach(ordered) { VideoCard(video: $0, queue: Array(ordered)).padding(.horizontal) }
-                }
+                VideoGrid(videos: Array(ordered), spacing: 20)
             }
             .padding(.vertical)
         }
@@ -335,6 +334,7 @@ struct VideoPlaylistView: View {
             if let error { ErrorView(message: error) { Task { await load() } } }
         }
         .listStyle(.plain)
+        .readableContentWidth()
         .overlay { if videos.isEmpty && error == nil { LoadingView() } }
         .navigationTitle(loadedTitle ?? title)
         .task { if videos.isEmpty { await load() } }
@@ -375,7 +375,7 @@ struct SubscriptionsView: View {
                 }
                 let cutoff = maxAgeDays > 0 ? Calendar.current.date(byAdding: .day, value: -maxAgeDays, to: .now) : nil
                 let visible = feed.filter { (channelFilter == nil || $0.channelId == channelFilter) && (cutoff == nil || ($0.publishedDate ?? .now) >= cutoff!) }
-                ForEach(visible) { VideoCard(video: $0, queue: visible).padding(.horizontal) }
+                VideoGrid(videos: visible, spacing: 20)
                 if loading && feed.isEmpty { LoadingView() }
             }
             .padding(.vertical)
@@ -479,6 +479,7 @@ struct VideoListView: View {
                 }
         }
         .listStyle(.plain)
+        .readableContentWidth()
         .overlay { if videos.isEmpty { ContentUnavailableView("Nothing here yet", systemImage: "play.rectangle") } }
         .navigationTitle(kind == .history ? Text("History") : kind == .watchLater ? Text("Watch Later") : Text("Liked videos"))
     }
@@ -509,6 +510,7 @@ struct VideoLibraryView: View {
                 }
             }
         }
+        .readableContentWidth()
         .navigationTitle("Library")
         .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
     }
@@ -533,6 +535,7 @@ struct AccountHistoryView: View {
     var body: some View {
         List { ForEach(videos) { VideoCard(video: $0, compact: true, queue: videos) } }
             .listStyle(.plain)
+            .readableContentWidth()
             .overlay {
                 if loading { LoadingView() }
                 else if videos.isEmpty { ContentUnavailableView("Nothing here yet", systemImage: "clock") }

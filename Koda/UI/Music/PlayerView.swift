@@ -12,6 +12,12 @@ struct PlayerView: View {
     @State private var showLyrics = false
     @State private var showStylePicker = false
     @State private var dragOffset: CGFloat = 0
+    @State private var sidePanel = SidePanel.lyrics
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    enum SidePanel: Hashable { case lyrics, queue }
+
+    private var isWide: Bool { UIUserInterfaceIdiom.allowsWideLayout(sizeClass) }
 
     private var style: PlayerStyle { PlayerStyle(rawValue: styleRaw) ?? .classic }
 
@@ -20,15 +26,22 @@ struct PlayerView: View {
             PlayerBackground(style: style)
             VStack(spacing: 0) {
                 header
-                if showLyrics {
-                    LyricsPanel().transition(.opacity.combined(with: .scale(scale: 0.96)))
-                    PlayerControls(compact: true).padding(.horizontal, 24).padding(.bottom, 8)
+                if isWide {
+                    wideBody
                 } else {
-                    styleBody.transition(.opacity)
+                    if showLyrics {
+                        LyricsPanel().transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        PlayerControls(compact: true).padding(.horizontal, 24).padding(.bottom, 8)
+                    } else {
+                        styleBody.transition(.opacity)
+                    }
+                    bottomBar
                 }
-                bottomBar
             }
         }
+        // On a wide layout lyrics and the queue are always beside the artwork, so the Bento tiles pick the panel instead.
+        .onChange(of: showLyrics) { _, on in if on && isWide { sidePanel = .lyrics; showLyrics = false } }
+        .onChange(of: showQueue) { _, on in if on && isWide { sidePanel = .queue; showQueue = false } }
         .offset(y: dragOffset)
         .gesture(DragGesture().onChanged { v in if v.translation.height > 0 { dragOffset = v.translation.height } }
             .onEnded { v in if v.translation.height > 140 { dismiss() }; withAnimation(.spring) { dragOffset = 0 } })
@@ -65,6 +78,38 @@ struct PlayerView: View {
             PlayerMenu(showStylePicker: $showStylePicker)
         }
         .padding(.horizontal, 20).padding(.top, 8)
+    }
+
+    /// iPad and other wide windows: the player style on the leading side, lyrics or the queue on the trailing side.
+    private var wideBody: some View {
+        HStack(spacing: 0) {
+            styleBody
+                .frame(maxWidth: 560)
+                .frame(maxWidth: .infinity)
+            VStack(spacing: 12) {
+                HStack(spacing: 14) {
+                    Picker("Panel", selection: $sidePanel) {
+                        Text("Lyrics").tag(SidePanel.lyrics)
+                        Text("Up Next").tag(SidePanel.queue)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 320)
+                    Spacer()
+                    AirPlayButton().frame(width: 44, height: 44).glassEffect(.regular.interactive(), in: .circle)
+                }
+                .padding(.horizontal, 20)
+                Group {
+                    switch sidePanel {
+                    case .lyrics: LyricsPanel()
+                    case .queue: QueueView()
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 28))
+            }
+            .padding(.vertical, 12)
+            .padding(.trailing, 20)
+            .frame(maxWidth: .infinity)
+        }
     }
 
     private var bottomBar: some View {

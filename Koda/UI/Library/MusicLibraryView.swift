@@ -46,6 +46,7 @@ struct MusicLibraryView: View {
                 }
             }
         }
+        .readableContentWidth()
         .navigationTitle("Library")
         .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() }; ToolbarItem(placement: .topBarTrailing) { EditButton() } }
         .alert("New Playlist", isPresented: $showNewPlaylist) {
@@ -153,6 +154,7 @@ struct LocalPlaylistView: View {
                 }
             }
             .listStyle(.plain)
+            .readableContentWidth()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -190,6 +192,7 @@ struct LikedSongsView: View {
         }
         .listStyle(.plain)
         .overlay { if songs.isEmpty { ContentUnavailableView("No liked songs", systemImage: "heart", description: Text("Tap the heart on any song.")) } }
+        .readableContentWidth()
         .navigationTitle("Liked songs")
         .toolbar { Menu { Picker("Sort", selection: $sort) { ForEach(SongSort.allCases) { Text($0.title).tag($0) } } } label: { Image(systemName: "arrow.up.arrow.down") } }
     }
@@ -234,6 +237,7 @@ struct DownloadsView: View {
         }
         .listStyle(.plain)
         .overlay { if songs.isEmpty && downloads.pending.isEmpty { ContentUnavailableView("No downloads", systemImage: "arrow.down.circle", description: Text("Downloaded songs play without a connection.")) } }
+        .readableContentWidth()
         .navigationTitle("Downloads")
     }
 }
@@ -257,6 +261,7 @@ struct HistoryView: View {
             }
         }
         .overlay { if days.isEmpty { ContentUnavailableView("No history", systemImage: "clock") } }
+        .readableContentWidth()
         .navigationTitle("History")
         .toolbar { Button("Clear", role: .destructive) { library.data.plays.removeAll() } }
     }

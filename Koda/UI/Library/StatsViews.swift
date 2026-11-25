@@ -67,6 +67,7 @@ struct StatsView: View {
                 }
             }
         }
+        .readableContentWidth()
         .navigationTitle("Statistics")
         .overlay { if library.data.plays.isEmpty { ContentUnavailableView("No plays yet", systemImage: "chart.bar", description: Text("Statistics come only from plays on this device.")) } }
     }
@@ -138,6 +139,7 @@ struct RecapView: View {
             }
             .padding()
         }
+        .readableContentWidth(640)
         .navigationTitle("Recap")
     }
 

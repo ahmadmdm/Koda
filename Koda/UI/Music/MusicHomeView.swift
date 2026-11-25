@@ -136,7 +136,11 @@ struct MusicHomeView: View {
     private func speedDial(_ songs: [Song]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Speed dial", systemImage: "bolt.fill").font(.title3.bold()).padding(.horizontal)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+            // Three columns on iPhone; as many as fit on iPad.
+            LazyVGrid(columns: UIDevice.current.userInterfaceIdiom == .pad
+                      ? [GridItem(.adaptive(minimum: 110, maximum: 180), spacing: 10)]
+                      : Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
+                      alignment: .leading, spacing: 10) {
                 ForEach(Array(songs.enumerated()), id: \.element.id) { i, song in
                     Button { player.play(songs, startAt: i) } label: {
                         Artwork(url: song.artwork, cornerRadius: 14)

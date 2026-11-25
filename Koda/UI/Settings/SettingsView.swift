@@ -139,6 +139,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .readableContentWidth()
         .navigationTitle("Settings")
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search settings")
         .confirmationDialog("Clear all history?", isPresented: $confirmClear, titleVisibility: .visible) {

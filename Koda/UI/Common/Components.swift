@@ -279,7 +279,10 @@ struct QuickPicksGrid: View {
             LazyHGrid(rows: Array(repeating: GridItem(.fixed(58), spacing: 6), count: 4), spacing: 16) {
                 ForEach(Array(songs.enumerated()), id: \.element.id) { i, song in
                     SongRow(song: song) { player.play(songs, startAt: i) }
-                        .containerRelativeFrame(.horizontal) { w, _ in w * 0.86 }
+                        .containerRelativeFrame(.horizontal) { w, _ in
+                            // iPhone: one column and a peek of the next. iPad: as many ~400pt columns as fit.
+                            UIDevice.current.userInterfaceIdiom != .pad || w < 600 ? w * 0.86 : w / max(2, (w / 400).rounded(.down)) - 24
+                        }
                 }
             }
             .scrollTargetLayout()
