@@ -11,8 +11,15 @@ nonisolated struct Song: Codable, Hashable, Identifiable, Sendable {
     var thumbnail: String?
     var isVideo: Bool = false
 
-    var artwork: URL? { thumbnail.flatMap { URL(string: $0.upscaledThumbnail()) } }
+    /// A file imported into Documents/Music: the id is `local:<file name>` (see `LocalMusicLibrary`).
+    var isLocal: Bool { id.hasPrefix(LocalMusicLibrary.idPrefix) }
+
+    var artwork: URL? {
+        if isLocal { return LocalMusicLibrary.artworkURL(for: id) }
+        return thumbnail.flatMap { URL(string: $0.upscaledThumbnail()) }
+    }
     var largeArtwork: URL? {
+        if isLocal { return LocalMusicLibrary.artworkURL(for: id) }
         if let t = thumbnail, t.contains("i.ytimg.com") {
             return URL(string: "https://i.ytimg.com/vi/\(id)/maxresdefault.jpg")
         }

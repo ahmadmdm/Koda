@@ -12,6 +12,11 @@ struct KodaApp: App {
     @AppStorage("palette") private var palette = Palette.violet.rawValue
     @AppStorage("onboarded") private var onboarded = false
 
+    init() {
+        Scrobbler.shared.start()
+        Task { await LocalMusicLibrary.shared.rescan() }
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

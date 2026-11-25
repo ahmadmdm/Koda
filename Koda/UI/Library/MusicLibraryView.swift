@@ -20,6 +20,7 @@ struct MusicLibraryView: View {
                 row(.savedCollections, "Albums & playlists", "square.stack.fill", .teal, "\(library.data.savedCollections.count)")
                 row(.followedArtists, "Artists", "music.microphone", .indigo, "\(library.data.followedArtists.count)")
             }
+            LocalMusicSection()
             if account.isSignedIn { AccountMusicLibrarySection() }
             Section {
                 ForEach(library.data.playlists) { p in
