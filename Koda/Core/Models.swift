@@ -136,6 +136,7 @@ nonisolated struct WatchDetails: Sendable {
     var related: [Video]
     var commentsToken: String?
     var commentCount: String?
+    var liveChat: LiveChatSource? = nil
 }
 
 nonisolated struct Comment: Identifiable, Hashable, Sendable {

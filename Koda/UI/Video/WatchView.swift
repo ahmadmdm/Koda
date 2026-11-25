@@ -115,6 +115,7 @@ struct WatchView: View {
     @Environment(AppState.self) private var app
     @State private var showComments = false
     @State private var showDescription = false
+    @State private var showChat = false
 
     var body: some View {
         @Bindable var model = model
@@ -176,6 +177,11 @@ struct WatchView: View {
                 }
                 .padding()
             }
+            .overlay {
+                if showChat, let chat = model.details?.liveChat {
+                    LiveChatPanel(source: chat) { showChat = false }
+                }
+            }
         }
         .background(Color(.systemBackground))
         .sheet(isPresented: $showComments) {
@@ -220,6 +226,11 @@ struct WatchView: View {
                             }
                             Button { library.toggleWatchLater(video) } label: {
                                 Label("Save", systemImage: library.isInWatchLater(video.id) ? "bookmark.fill" : "bookmark")
+                            }
+                            if let chat = d?.liveChat {
+                                Button { showChat.toggle() } label: {
+                                    Label(chat.isReplay ? "Chat replay" : "Live chat", systemImage: showChat ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
+                                }
                             }
                             if d?.commentsToken != nil {
                                 Button { showComments = true } label: { Label(d?.commentCount.map { "Comments \($0)" } ?? "Comments", systemImage: "text.bubble") }
@@ -312,6 +323,7 @@ struct LinkedText: View {
 struct CommentsView: View {
     var token: String
     var count: String?
+    var endpoint = "next"
     @Environment(VideoPlayerModel.self) private var model
     @State private var comments: [Comment] = []
     @State private var next: String?
@@ -345,14 +357,14 @@ struct CommentsView: View {
         }
         .presentationDetents([.medium, .large])
         .task {
-            do { (comments, next) = try await VideoAPI.comments(token: token) } catch { self.error = error.localizedDescription }
+            do { (comments, next) = try await VideoAPI.comments(token: token, endpoint: endpoint) } catch { self.error = error.localizedDescription }
             loading = false
         }
     }
 
     private func more() async {
         guard let token = next else { return }
-        if let (c, n) = try? await VideoAPI.comments(token: token), !c.isEmpty {
+        if let (c, n) = try? await VideoAPI.comments(token: token, endpoint: endpoint), !c.isEmpty {
             let ids = Set(comments.map(\.id))
             comments += c.filter { !ids.contains($0.id) }
             next = n == token ? nil : n

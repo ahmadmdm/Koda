@@ -58,7 +58,9 @@ Search for videos, channels and playlists, with sort options. The watch page use
 Picture in Picture, AirPlay, speeds, chapters, SponsorBlock, resume positions, autoplay of the next video, comments with
 tappable timestamps, and a description with links. Channel pages with search and sort. Local subscriptions with a feed
 built from the channels' RSS, filtered by channel and upload age. Watch Later, liked videos, history, "Not interested"
-and blocking a channel.
+and blocking a channel. Shorts: a shelf on Home and on channel pages, and a full-screen swipe pager (its own looping
+AVPlayer per Short, mute, like, subscribe, comments, share) fed by the reel sequence; `youtube.com/shorts/` links open it.
+Live chat (and chat replay for finished streams, in step with the video) under the player on the watch page.
 
 **App:** a Music/Video mode switch, light, dark and system themes, eight palettes plus a colour taken from the artwork,
 haptic levels, content region and language, searchable settings, backup and restore of the whole library as JSON,
@@ -115,7 +117,7 @@ Ported from the Android app (`docs/identity.md` in the Android repo):
 
 ## Not ported (Android-only or account-only)
 
-Live chat, Shorts, Android Auto, Discord and Last.fm,
+Android Auto, Discord and Last.fm,
 on-device music files, video shaders and frame interpolation.
 
 ## Layout

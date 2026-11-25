@@ -116,6 +116,7 @@ struct VideoHomeView: View {
                         }
                     }
                 }
+                ShortsShelf(source: .search(topic.query.isEmpty ? "trending shorts" : topic.query + " shorts"))
                 if loading && videos.isEmpty { LoadingView() }
                 if let error, videos.isEmpty { ErrorView(message: error) { Task { await load() } } }
                 let visible = library.filtered(videos)
@@ -303,6 +304,7 @@ struct ChannelView: View {
                 }
                 .buttonStyle(library.isSubscribed(page.id) ? AnyPrimitiveButtonStyle(.glass) : AnyPrimitiveButtonStyle(.glassProminent))
                 .controlSize(.large).padding(.horizontal)
+                ShortsShelf(source: .channel(page.id))
                 HStack {
                     TextField("Search uploads", text: $filter).textFieldStyle(.roundedBorder)
                     Button { sortNewest.toggle() } label: { Label(sortNewest ? "Newest" : "Oldest", systemImage: "arrow.up.arrow.down") }.buttonStyle(.glass)
