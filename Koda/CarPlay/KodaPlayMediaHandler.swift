@@ -206,4 +206,11 @@ final class KodaAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, handlerFor intent: INIntent) -> Any? {
         intent is INPlayMediaIntent ? KodaPlayMediaHandler.shared : nil
     }
+
+    /// Video downloads finish in a background URLSession; iOS wakes the app with its events.
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        guard identifier == VideoDownloadManager.sessionIdentifier else { completionHandler(); return }
+        VideoDownloadManager.shared.backgroundCompletion = completionHandler
+    }
 }

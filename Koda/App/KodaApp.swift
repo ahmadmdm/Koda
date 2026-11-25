@@ -18,6 +18,8 @@ struct KodaApp: App {
         Scrobbler.shared.start()
         Task { await LocalMusicLibrary.shared.rescan() }
         Diagnostics.shared.start()
+        // The background download session has to exist at launch to hear about downloads that ran while Koda was closed.
+        _ = VideoDownloadManager.shared
     }
 
     var body: some Scene {

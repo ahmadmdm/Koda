@@ -211,7 +211,20 @@ struct DownloadsView: View {
 
     var body: some View {
         let songs = library.data.downloads.map(\.song)
+        let videos = VideoDownloadManager.shared
         List {
+            if !videos.items.isEmpty || !videos.pending.isEmpty {
+                Section {
+                    NavigationLink(value: Route.videoDownloads) {
+                        HStack {
+                            Label("Videos", systemImage: "play.rectangle.fill")
+                            Spacer()
+                            Text("\(videos.items.count) • \(ByteCountFormatter.string(fromByteCount: videos.totalBytes, countStyle: .file))")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
             if !downloads.pending.isEmpty {
                 Section("In progress") {
                     ForEach(downloads.pending) { song in
@@ -244,7 +257,7 @@ struct DownloadsView: View {
             }
         }
         .listStyle(.plain)
-        .overlay { if songs.isEmpty && downloads.pending.isEmpty { ContentUnavailableView("No downloads", systemImage: "arrow.down.circle", description: Text("Downloaded songs play without a connection.")) } }
+        .overlay { if songs.isEmpty && downloads.pending.isEmpty && videos.items.isEmpty && videos.pending.isEmpty { ContentUnavailableView("No downloads", systemImage: "arrow.down.circle", description: Text("Downloaded songs play without a connection.")) } }
         .readableContentWidth()
         .navigationTitle("Downloads")
     }
