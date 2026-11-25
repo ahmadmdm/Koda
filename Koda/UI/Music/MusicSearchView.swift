@@ -60,6 +60,7 @@ struct MusicSearchView: View {
             }
         }
         .listStyle(.plain)
+        .readableContentWidth()
         .navigationTitle("Search")
         .searchable(text: $query, prompt: "Songs, artists, albums")
         .searchToolbarBehavior(.minimize)

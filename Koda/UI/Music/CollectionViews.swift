@@ -53,6 +53,7 @@ struct CollectionView: View {
             }
         }
         .listStyle(.plain)
+        .readableContentWidth()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

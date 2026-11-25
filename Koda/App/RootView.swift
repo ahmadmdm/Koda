@@ -44,6 +44,7 @@ struct RootView: View {
                 }
             }
         }
+        .tabViewStyle(.sidebarAdaptable)
         .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewBottomAccessory(isEnabled: player.current != nil || video.current != nil) {
             Group {

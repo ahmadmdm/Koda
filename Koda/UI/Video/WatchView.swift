@@ -116,78 +116,151 @@ struct WatchView: View {
     @State private var showComments = false
     @State private var showDescription = false
     @State private var showChat = false
+    @State private var sidePanel = SidePanel.related
+    @State private var width: CGFloat = 0
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    enum SidePanel: Hashable { case related, comments }
+
+    /// Side by side (video and details on the leading side, related or comments on the trailing side)
+    /// when the window is wide enough: iPad landscape and large windows. iPhone keeps the stacked page.
+    private var isWide: Bool { UIUserInterfaceIdiom.allowsWideLayout(sizeClass) && width >= 960 }
 
     var body: some View {
-        @Bindable var model = model
         VStack(spacing: 0) {
-            HStack {
-                Button { model.isPresented = false } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 40, height: 40) }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
-                Spacer()
-                TrackMenus()
-                Menu {
-                    Picker("Quality", selection: $model.quality) { ForEach(VideoQualityCap.allCases) { Text($0.title).tag($0) } }
-                } label: { Label(model.quality.title, systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize() }
-                .buttonStyle(.glass)
-                Button { model.close() } label: { Image(systemName: "xmark").font(.headline).frame(width: 40, height: 40) }
-                    .buttonStyle(.glass).buttonBorderShape(.circle)
-            }
-            .padding(.horizontal).padding(.bottom, 8)
-
-            ZStack {
-                Color.black
-                SystemVideoPlayer(player: model.player)
-                if model.isLoading { ProgressView().tint(.white).controlSize(.large) }
-                if let e = model.errorMessage {
-                    VStack(spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle)
-                        Text(e).multilineTextAlignment(.center).font(.callout)
-                        if let v = model.current { Button("Retry") { let c = v; model.close(); model.open(c) }.buttonStyle(.glass) }
-                    }.foregroundStyle(.white).padding()
-                }
-            }
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .overlay(alignment: .bottomLeading) {
-                if let notice = model.skippedNotice {
-                    Label(notice, systemImage: "forward.end.fill").font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10).padding(.vertical, 6).glassEffect(.regular, in: .capsule).padding(10)
-                        .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut, value: model.skippedNotice)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    info
-                    if !model.chapters.isEmpty { chapters }
-                    if let next = model.queue.first {
-                        HStack {
-                            Text("Up next").font(.headline)
-                            Spacer()
-                            Button { model.playNext() } label: { Label("Play", systemImage: "forward.fill") }.buttonStyle(.glass).controlSize(.small)
-                        }
-                        VideoCard(video: next, compact: true)
-                    }
-                    if let related = model.details?.related, !related.isEmpty {
-                        Text("Related").font(.headline)
-                        ForEach(library.filtered(related).filter { $0.id != model.queue.first?.id }) { v in
-                            VideoCard(video: v, compact: true, queue: library.filtered(related))
+            topBar
+            if isWide {
+                HStack(alignment: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        videoSurface
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .padding(.horizontal)
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 16) {
+                                info
+                                if !model.chapters.isEmpty { chapters }
+                            }
+                            .padding()
                         }
                     }
+                    .frame(maxWidth: .infinity)
+                    sideColumn
+                        .frame(width: min(420, width * 0.36))
+                        .overlay { chatPanel }
                 }
-                .padding()
-            }
-            .overlay {
-                if showChat, let chat = model.details?.liveChat {
-                    LiveChatPanel(source: chat) { showChat = false }
+            } else {
+                videoSurface
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        info
+                        if !model.chapters.isEmpty { chapters }
+                        upNextAndRelated
+                    }
+                    .padding()
                 }
+                .readableContentWidth(820)
+                .overlay { chatPanel }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(Color(.systemBackground))
         .sheet(isPresented: $showComments) {
             if let token = model.details?.commentsToken { CommentsView(token: token, count: model.details?.commentCount) }
         }
         .sheet(isPresented: $showDescription) { descriptionSheet }
+        .onChange(of: model.current?.id) { sidePanel = .related }
+    }
+
+    /// Live chat covers the area under the player, or the side column on wide windows.
+    @ViewBuilder private var chatPanel: some View {
+        if showChat, let chat = model.details?.liveChat {
+            LiveChatPanel(source: chat) { showChat = false }
+        }
+    }
+
+    private var topBar: some View {
+        @Bindable var model = model
+        return HStack {
+            Button { model.isPresented = false } label: { Image(systemName: "chevron.down").font(.headline).frame(width: 40, height: 40) }
+                .buttonStyle(.glass).buttonBorderShape(.circle)
+            Spacer()
+            TrackMenus()
+            PictureMenu()
+            Menu {
+                Picker("Quality", selection: $model.quality) { ForEach(VideoQualityCap.allCases) { Text($0.title).tag($0) } }
+            } label: { Label(model.quality.title, systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize() }
+            .buttonStyle(.glass)
+            Button { model.close() } label: { Image(systemName: "xmark").font(.headline).frame(width: 40, height: 40) }
+                .buttonStyle(.glass).buttonBorderShape(.circle)
+        }
+        .padding(.horizontal).padding(.bottom, 8)
+    }
+
+    private var videoSurface: some View {
+        ZStack {
+            Color.black
+            SystemVideoPlayer(player: model.player)
+                .pictureFilter()
+            if model.isLoading { ProgressView().tint(.white).controlSize(.large) }
+            if let e = model.errorMessage {
+                VStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle)
+                    Text(e).multilineTextAlignment(.center).font(.callout)
+                    if let v = model.current { Button("Retry") { let c = v; model.close(); model.open(c) }.buttonStyle(.glass) }
+                }.foregroundStyle(.white).padding()
+            }
+        }
+        .aspectRatio(16 / 9, contentMode: .fit)
+        .overlay(alignment: .bottomLeading) {
+            if let notice = model.skippedNotice {
+                Label(notice, systemImage: "forward.end.fill").font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10).padding(.vertical, 6).glassEffect(.regular, in: .capsule).padding(10)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut, value: model.skippedNotice)
+    }
+
+    @ViewBuilder private var upNextAndRelated: some View {
+        if let next = model.queue.first {
+            HStack {
+                Text("Up next").font(.headline)
+                Spacer()
+                Button { model.playNext() } label: { Label("Play", systemImage: "forward.fill") }.buttonStyle(.glass).controlSize(.small)
+            }
+            VideoCard(video: next, compact: true)
+        }
+        if let related = model.details?.related, !related.isEmpty {
+            Text("Related").font(.headline)
+            ForEach(library.filtered(related).filter { $0.id != model.queue.first?.id }) { v in
+                VideoCard(video: v, compact: true, queue: library.filtered(related))
+            }
+        }
+    }
+
+    /// The trailing column of the wide layout.
+    private var sideColumn: some View {
+        VStack(spacing: 10) {
+            if model.details?.commentsToken != nil {
+                Picker("Panel", selection: $sidePanel) {
+                    Text("Related").tag(SidePanel.related)
+                    Text("Comments").tag(SidePanel.comments)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+            }
+            if sidePanel == .comments, let token = model.details?.commentsToken {
+                CommentsView(token: token, count: model.details?.commentCount)
+                    .id(token)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) { upNextAndRelated }
+                        .padding(.horizontal)
+                        .padding(.bottom)
+                }
+            }
+        }
+        .padding(.trailing, 4)
     }
 
     private var info: some View {
@@ -233,7 +306,7 @@ struct WatchView: View {
                                 }
                             }
                             if d?.commentsToken != nil {
-                                Button { showComments = true } label: { Label(d?.commentCount.map { "Comments \($0)" } ?? "Comments", systemImage: "text.bubble") }
+                                Button { if isWide { sidePanel = .comments } else { showComments = true } } label: { Label(d?.commentCount.map { "Comments \($0)" } ?? "Comments", systemImage: "text.bubble") }
                             }
                             Button {
                                 MusicPlayer.shared.play([video.asSong], radio: true)
