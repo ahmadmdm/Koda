@@ -5260,12 +5260,12 @@
         }
       }
     },
-    "YouTube sees your connection as coming from %@, where this may be blocked. If you use a VPN, turn it off or pick another country.": {
+    "YouTube sees your connection as coming from %@, where this may be blocked. A VPN, proxy or custom DNS (such as NextDNS or Hiddify) can cause this: turn it off for YouTube.": {
       "localizations": {
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يرى يوتيوب أن اتصالك قادم من %@، وقد يكون هذا المحتوى محجوبًا هناك. إذا كنت تستخدم VPN فأوقفه أو اختر دولة أخرى."
+            "value": "يرى يوتيوب أن اتصالك قادم من %@، وقد يكون هذا المحتوى محجوبًا هناك. قد يكون السبب VPN أو بروكسي أو DNS مخصص (مثل NextDNS أو Hiddify): أوقفه ليوتيوب."
           }
         }
       }

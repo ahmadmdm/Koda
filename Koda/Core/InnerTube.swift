@@ -216,11 +216,11 @@ nonisolated final class InnerTube: Sendable {
     }
 
     /// When a video is refused and YouTube sees the connection in another country than the
-    /// iPhone's region, a VPN is the usual cause: say so instead of only "unavailable".
+    /// iPhone's region, a VPN, proxy or DNS that routes YouTube abroad is the usual cause: say so instead of only "unavailable".
     private func connectionCountryHint() async -> String? {
         guard let country = await connectionCountry(), country != region else { return nil }
         let name = Locale.current.localizedString(forRegionCode: country) ?? country
-        return String(localized: "YouTube sees your connection as coming from \(name), where this may be blocked. If you use a VPN, turn it off or pick another country.")
+        return String(localized: "YouTube sees your connection as coming from \(name), where this may be blocked. A VPN, proxy or custom DNS (such as NextDNS or Hiddify) can cause this: turn it off for YouTube.")
     }
 
     private func player(videoId: String, client: PlayerClient, visitorData vd: String) async throws -> J {
