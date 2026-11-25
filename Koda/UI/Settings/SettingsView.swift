@@ -75,13 +75,20 @@ struct SettingsView: View {
                 }
             }
             if matches(.player) {
-                Section("Player") {
+                Section {
                     Picker("Player style", selection: $playerStyle) {
                         ForEach(PlayerStyle.allCases) { Label($0.title, systemImage: $0.icon).tag($0.rawValue) }
                     }
                     Toggle("Ambient artwork background", isOn: $ambient)
                     Toggle("Live Activity", isOn: $liveActivity)
-                        .onChange(of: liveActivity) { LiveActivitySync.update(MusicPlayer.shared) }
+                        .onChange(of: liveActivity) {
+                            LiveActivitySync.update(MusicPlayer.shared)
+                            DownloadActivitySync.settingChanged()
+                        }
+                } header: {
+                    Text("Player")
+                } footer: {
+                    Text("The Live Activity shows what's playing, and video downloads, on the Lock Screen and in the Dynamic Island.")
                 }
             }
             if matches(.playback) {

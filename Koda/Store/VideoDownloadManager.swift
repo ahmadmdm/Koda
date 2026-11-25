@@ -1,3 +1,4 @@
+import os
 import AVFoundation
 import CoreMedia
 import Foundation
@@ -25,6 +26,8 @@ nonisolated struct PendingVideoDownload: Codable, Hashable, Sendable {
     var quality: String
     var isAudioOnly: Bool
     var relativePath: String?
+    /// The size the quality sheet showed, for the Live Activity's progress across downloads.
+    var estimatedBytes: Int64? = nil
 }
 
 /// One quality the viewer can pick for a download.
@@ -56,7 +59,8 @@ final class VideoDownloadManager {
 
     private(set) var items: [DownloadedVideo] = [] { didSet { save() } }
     private(set) var pending: [String: PendingVideoDownload] = [:] { didSet { save() } }
-    private(set) var states: [String: State] = [:]
+    /// Every change reaches the download Live Activity, which throttles its own updates.
+    private(set) var states: [String: State] = [:] { didSet { DownloadActivitySync.refresh(self) } }
 
     /// Called once the background session has delivered its events (`handleEventsForBackgroundURLSession`).
     @ObservationIgnored var backgroundCompletion: (() -> Void)?
@@ -259,7 +263,8 @@ final class VideoDownloadManager {
         var video = video
         if video.title.isEmpty { video.title = prep.title }
         if video.channel.isEmpty { video.channel = prep.author }
-        pending[video.id] = PendingVideoDownload(video: video, quality: option.label, isAudioOnly: option.isAudioOnly)
+        pending[video.id] = PendingVideoDownload(video: video, quality: option.label, isAudioOnly: option.isAudioOnly,
+                                                 estimatedBytes: option.estimatedBytes)
         states[video.id] = .downloading(0)
         if option.isAudioOnly {
             guard let url = prep.audioURL else { fail(video.id, InnerTubeError.noStream); return }
@@ -415,17 +420,43 @@ final class VideoDownloadManager {
                 return
             }
             if let path { try? FileManager.default.removeItem(at: Self.absolute(path)) }
+            // googlevideo refuses a stream now and then (CoreMedia -12938, HTTP 403): usually the
+            // visitor token it was resolved under. Resolve it again under a fresh token, once.
+            if let p = pending[id], !autoRetried.contains(id), Self.isRefusal(error) {
+                autoRetried.insert(id)
+                playbackLog.info("download \(id, privacy: .public) refused, retrying with a fresh link")
+                Task {
+                    _ = await InnerTube.shared.visitorData(forceNew: true)
+                    retry(p.video, quality: p.quality)
+                }
+                return
+            }
+            autoRetried.remove(id)
             fail(id, error)
             return
         }
+        autoRetried.remove(id)
         guard let path else { fail(id, InnerTubeError.empty); return }
         let url = Self.absolute(path)
         finish(id, location: url, bytes: Self.size(of: url))
     }
 
+    /// Downloads already retried once after a refused stream.
+    private var autoRetried: Set<String> = []
+
+    nonisolated static func isRefusal(_ error: any Error) -> Bool {
+        let ns = error as NSError
+        return (ns.domain == "CoreMediaErrorDomain" && [-12938, -12660, -12937, -16845].contains(ns.code))
+            || (ns.domain == NSURLErrorDomain && ns.code == NSURLErrorBadServerResponse)
+    }
+
     fileprivate func finishedBackgroundEvents() {
-        backgroundCompletion?()
-        backgroundCompletion = nil
+        // Update or end the Live Activity before iOS suspends Koda again.
+        Task {
+            await DownloadActivitySync.flush(self)
+            backgroundCompletion?()
+            backgroundCompletion = nil
+        }
     }
 
     private func finish(_ id: String, location: URL, bytes: Int64) {
@@ -442,6 +473,8 @@ final class VideoDownloadManager {
     }
 
     private func fail(_ id: String, _ error: any Error) {
+        let ns = error as NSError
+        playbackLog.error("download failed \(id, privacy: .public): \(ns.domain, privacy: .public) \(ns.code) \(String(describing: ns.userInfo), privacy: .public)")
         hlsTasks[id] = nil
         pending[id]?.relativePath = nil
         if pending[id] != nil { states[id] = .failed(error.localizedDescription) }

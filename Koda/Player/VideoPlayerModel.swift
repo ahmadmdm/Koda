@@ -479,7 +479,7 @@ final class VideoPlayerModel {
     }
 
     /// YouTube's hqdefault thumbnails are 4:3 with black bars around a 16:9 picture: keep the picture.
-    private static func removingLetterbox(_ image: UIImage) -> UIImage {
+    nonisolated static func removingLetterbox(_ image: UIImage) -> UIImage {
         guard let cg = image.cgImage, abs(Double(cg.width) / Double(max(cg.height, 1)) - 4.0 / 3.0) < 0.05 else { return image }
         let bar = Int(Double(cg.height) * 0.125)
         guard let cropped = cg.cropping(to: CGRect(x: 0, y: bar, width: cg.width, height: cg.height - 2 * bar)) else { return image }

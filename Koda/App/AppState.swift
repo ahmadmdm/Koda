@@ -83,6 +83,19 @@ final class AppState {
             }
             return
         }
+        // The download Live Activity: the downloaded videos, in video mode.
+        if url.scheme == "koda", url.host == "downloads" {
+            mode = .video
+            let wasShowing = closeVideoCovers() || showPlayer
+            showPlayer = false
+            afterCoverDismissal(wasShowing) {
+                // From the tab's root, so tapping the activity again doesn't stack another copy.
+                if self.tab == .settings { self.tab = .home }
+                self.paths[self.tab] = NavigationPath()
+                self.navigate(.videoDownloads)
+            }
+            return
+        }
         let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let query = Dictionary((comps?.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
         let host = url.host ?? ""

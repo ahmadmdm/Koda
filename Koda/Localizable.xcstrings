@@ -6017,6 +6017,16 @@
           }
         }
       }
+    },
+    "The Live Activity shows what's playing, and video downloads, on the Lock Screen and in the Dynamic Island.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يعرض النشاط المباشر ما يُشغَّل الآن وتنزيلات الفيديو على شاشة القفل وفي الجزيرة الديناميكية."
+          }
+        }
+      }
     }
   }
 }
