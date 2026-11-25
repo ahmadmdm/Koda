@@ -55,8 +55,13 @@ echo "→ Installing…"
 xcrun devicectl device install app --device "$UDID" build/device/Build/Products/Release-iphoneos/Koda.app >/dev/null
 
 echo "→ Opening…"
-if ! xcrun devicectl device process launch --device "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
-  echo "Installed. On the iPhone: Settings › General › VPN & Device Management › trust the developer, then open Koda."
+if ! OUT=$(xcrun devicectl device process launch --device "$UDID" "$BUNDLE_ID" 2>&1); then
+  echo "Installed, but it couldn't be opened from the Mac:"
+  if [[ "$OUT" == *"untrusted"* || "$OUT" == *"profile"* || "$OUT" == *"denied"* ]]; then
+    echo "  On the iPhone: Settings › General › VPN & Device Management › trust the developer, then open Koda."
+  else
+    echo "  The iPhone is locked or no longer connected. Unlock it and open Koda from the Home Screen."
+  fi
   exit 0
 fi
 echo "✓ Koda is installed and open."
