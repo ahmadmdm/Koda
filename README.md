@@ -115,10 +115,29 @@ Ported from the Android app (`docs/identity.md` in the Android repo):
   device's follows.
 - **Sync:** likes, saves, Watch Later and subscriptions are sent back to the account.
 
-## Not ported (Android-only or account-only)
+## More in this version
 
-Android Auto, Discord and Last.fm,
-on-device music files, video shaders and frame interpolation.
+- **Live Activity**: the song playing on the Lock Screen and in the Dynamic Island, with play/pause and next
+  (Settings › Player › Live Activity).
+- **Siri and Shortcuts**: "Play my liked songs in Koda", "Shuffle my library in Koda", "Play ‹playlist› in Koda",
+  "Search Koda", "Start radio in Koda", "What's playing in Koda".
+- **Shorts**: a vertical pager from the video home's Shorts shelf, channel pages and youtube.com/shorts links.
+- **Live chat**: live and replayed chat under the player for live streams.
+- **Last.fm**: scrobbling with your own Last.fm API key (Settings › Last.fm), with an offline queue.
+- **Music files on this iPhone**: import MP3, M4A, AAC, WAV, FLAC or AIFF (Library › On this iPhone), or drop them in
+  the Koda folder with the Files app or Finder.
+- **Picture filters** for videos (vivid, warm, cool, mono, sepia, night, cinema, plus brightness, contrast and
+  saturation). YouTube's HLS streams don't take video compositions, so these are SwiftUI colour effects on the player.
+- **iPad**: sidebar, adaptive grids, and side-by-side player and watch page on wide windows.
+- **Diagnostics**: crash and hang reports from MetricKit stay on the device (Settings › About › Diagnostics).
+- **Tests**: `KodaTests` (Swift Testing) parses saved YouTube responses offline:
+  `xcodebuild test -project Koda.xcodeproj -scheme Koda -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`.
+
+## Not ported
+
+- Android Auto (CarPlay instead).
+- Discord status: Discord's "listening to" needs its desktop app, which an iPhone can't talk to.
+- Frame interpolation, and true sharpening (needs a Metal shader on the system player view).
 
 ## Layout
 
