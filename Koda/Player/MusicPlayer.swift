@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import GoogleCast
 import MediaPlayer
 import Observation
 import UIKit
@@ -20,8 +21,8 @@ enum RepeatMode: String, CaseIterable { case off, all, one
 final class MusicPlayer {
     static let shared = MusicPlayer()
 
-    private(set) var queue: [Song] = [] { didSet { queueChanged = true; syncCurrentId() } }
-    private(set) var index: Int = 0 { didSet { syncCurrentId() } }
+    private(set) var queue: [Song] = [] { didSet { queueChanged = true; syncCurrentId(); scheduleCastSync() } }
+    private(set) var index: Int = 0 { didSet { syncCurrentId(); scheduleCastSync() } }
     var current: Song? { queue.indices.contains(index) ? queue[index] : nil }
     /// The current song's id, stored apart from `queue`: song rows compare against it, and reading
     /// `current` would redraw every visible row whenever the queue grows or a duration is filled in.
@@ -36,13 +37,22 @@ final class MusicPlayer {
 
     var shuffle = UserDefaults.standard.bool(forKey: "shuffle") { didSet { UserDefaults.standard.set(shuffle, forKey: "shuffle") } }
     var repeatMode = RepeatMode(rawValue: UserDefaults.standard.string(forKey: "repeatMode") ?? "off") ?? .off {
-        didSet { UserDefaults.standard.set(repeatMode.rawValue, forKey: "repeatMode") }
+        didSet {
+            UserDefaults.standard.set(repeatMode.rawValue, forKey: "repeatMode")
+            if isCastingMusic, oldValue != repeatMode { CastManager.shared.setRepeatOne(repeatMode == .one); scheduleCastSync() }
+        }
     }
-    var rate: Float = 1 { didSet { if isPlaying { player.rate = rate }; updateNowPlaying() } }
+    var rate: Float = 1 {
+        didSet {
+            if isCastingMusic { CastManager.shared.setRate(rate) } else if isPlaying { player.rate = rate }
+            updateNowPlaying()
+        }
+    }
     var radioEnabled = true
 
     var sleepTimerEnd: Date?
-    var sleepAtEndOfTrack = false
+    /// Nothing is queued on a Cast receiver after the song while this is on.
+    var sleepAtEndOfTrack = false { didSet { if oldValue != sleepAtEndOfTrack { scheduleCastSync() } } }
     @ObservationIgnored private var sleepTask: Task<Void, Never>?
 
     @ObservationIgnored let player = AVPlayer()
@@ -74,6 +84,9 @@ final class MusicPlayer {
     @ObservationIgnored private var queueChanged = true
     @ObservationIgnored private var savedQueueStart = -1
     @ObservationIgnored private var savedPositionBucket = -1
+    /// The songs this app queued on the Cast receiver after the current one, in order.
+    @ObservationIgnored private var castQueued: [String] = []
+    @ObservationIgnored private var castSyncTask: Task<Void, Never>?
 
     var library: LibraryStore { .shared }
 
@@ -81,7 +94,8 @@ final class MusicPlayer {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, policy: .longFormAudio)
         player.automaticallyWaitsToMinimizeStalling = true
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
-            MainActor.assumeIsolated { self?.tick(time.seconds) }
+            // While casting, the position comes from the receiver (`castTick`).
+            MainActor.assumeIsolated { if self?.isCasting == false { self?.tick(time.seconds) } }
         }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] note in
             // Compare identities, so the non-Sendable notification never crosses into the main actor.
@@ -95,7 +109,8 @@ final class MusicPlayer {
             let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
             let options = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt).map(AVAudioSession.InterruptionOptions.init)
             MainActor.assumeIsolated {
-                guard let self else { return }
+                // A call on the iPhone doesn't stop what plays on the TV.
+                guard let self, !self.isCasting else { return }
                 if type == .began {
                     self.wasPlayingBeforeInterruption = self.isPlaying
                     self.isPlaying = false
@@ -112,7 +127,7 @@ final class MusicPlayer {
             guard reason == .oldDeviceUnavailable else { return }
             // Headphones unplugged or disconnected: AVPlayer pauses, so say so everywhere.
             MainActor.assumeIsolated {
-                guard let self, self.isPlaying || self.wantsPlayback else { return }
+                guard let self, !self.isCasting, self.isPlaying || self.wantsPlayback else { return }
                 self.stopPlayback()
             }
         }
@@ -220,6 +235,20 @@ final class MusicPlayer {
         guard let song = current else { return }
         wantsPlayback = true
         claimAudio()
+        if isCasting {
+            // On the receiver already: resume it; otherwise (a video was cast since, or it finished) load it there.
+            let cast = CastManager.shared
+            if cast.isCastingMusic, cast.lastStatus?.contentID == song.id, cast.lastStatus?.state != .idle {
+                cast.play()
+                isPlaying = true
+                updateNowPlaying()
+            } else if isLoading {
+                isPlaying = true
+            } else {
+                load(autoplay: true, resumeAt: currentTime)
+            }
+            return
+        }
         if player.currentItem == nil || itemSongId != song.id {
             // The player holds nothing, or still the previous song: let the running load start this
             // one, or load it at the saved position.
@@ -240,6 +269,7 @@ final class MusicPlayer {
     private func stopPlayback() {
         wantsPlayback = false
         player.pause()
+        if isCastingMusic { CastManager.shared.pause() }
         isPlaying = false
         updateNowPlaying()
         saveSession()
@@ -274,6 +304,13 @@ final class MusicPlayer {
     }
 
     func seek(to seconds: Double) {
+        if isCastingMusic {
+            CastManager.shared.seek(to: seconds)
+            currentTime = seconds
+            lastTick = seconds
+            updateNowPlaying()
+            return
+        }
         let target = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = seconds
@@ -340,6 +377,10 @@ final class MusicPlayer {
             do {
                 let (url, loudness) = try await streamURL(for: song)
                 guard !Task.isCancelled, self.current?.id == song.id else { return }
+                if CastManager.shared.isConnected {
+                    try await self.castLoad(song, url: url, resumeAt: resumeAt)
+                    return
+                }
                 let asset = AVURLAsset(url: url, options: url.isFileURL ? nil : ["AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": InnerTube.userAgent(for: url)]])
                 let item = AVPlayerItem(asset: asset)
                 item.audioTimePitchAlgorithm = .timeDomain
@@ -508,7 +549,11 @@ final class MusicPlayer {
         playbackLog.info("ended \(self.current?.id ?? "-", privacy: .public) at \(self.currentTime) of \(self.duration)")
         commitListening()
         if sleepAtEndOfTrack { sleepAtEndOfTrack = false; pause(); seek(to: 0); return }
-        if repeatMode == .one { seek(to: 0); player.playImmediately(atRate: rate); return }
+        if repeatMode == .one {
+            seek(to: 0)
+            if isCastingMusic { CastManager.shared.play() } else { player.playImmediately(atRate: rate) }
+            return
+        }
         if index + 1 >= queue.count, repeatMode != .all {
             Task { await extendWithRadio(seed: current?.id, thenAdvance: true) }
             if !radioEnabled || current?.isLocal == true { isPlaying = false }
@@ -522,11 +567,13 @@ final class MusicPlayer {
         if isPlaying, seconds > lastTick, seconds - lastTick < 2 { listenedSeconds += seconds - lastTick; updatePlayRecord() }
         lastTick = seconds
         currentTime = seconds
-        if (current?.duration ?? 0) == 0, let d = player.currentItem?.duration.seconds, d.isFinite, d > 0, abs(d - duration) > 0.5 { duration = d }
+        if isCasting {
+            if let known = current?.duration, known > 0, duration != Double(known) { duration = Double(known) }
+        } else if (current?.duration ?? 0) == 0, let d = player.currentItem?.duration.seconds, d.isFinite, d > 0, abs(d - duration) > 0.5 { duration = d }
         else if let known = current?.duration, known > 0, duration != Double(known) { duration = Double(known) }
         // Should the file run past YouTube's stated length, end the track there.
-        if duration > 0, isPlaying, !isLoading, seconds >= duration + 1 { trackEnded() }
-        if isPlaying && player.timeControlStatus == .paused && player.currentItem?.status == .readyToPlay && player.rate == 0 && !isLoading {
+        if !isCasting, duration > 0, isPlaying, !isLoading, seconds >= duration + 1 { trackEnded() }
+        if !isCasting && isPlaying && player.timeControlStatus == .paused && player.currentItem?.status == .readyToPlay && player.rate == 0 && !isLoading {
             // Paused by the system (route change, another app).
             isPlaying = false
             updateNowPlaying()
@@ -613,6 +660,7 @@ final class MusicPlayer {
     }
 
     func stop() {
+        if isCastingMusic { CastManager.shared.stopMedia() }
         commitListening()
         player.replaceCurrentItem(with: nil)
         itemSongId = nil
@@ -729,3 +777,213 @@ final class MusicPlayer {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
 }
+
+// MARK: Google Cast
+
+extension MusicPlayer {
+    /// A Cast session is up: loads go to the receiver, whatever it plays now.
+    var isCasting: Bool { CastManager.shared.isConnected }
+    /// The receiver plays this queue: transport goes there.
+    var isCastingMusic: Bool { CastManager.shared.isCastingMusic }
+
+    /// A session just started: move the current song there, at its position, playing if it played.
+    func castCurrent() {
+        guard current != nil else { return }
+        let local = player.currentTime().seconds
+        let position = itemSongId == current?.id && local.isFinite && local > 0 ? local : currentTime
+        let playing = isPlaying || wantsPlayback
+        player.pause()
+        castQueued = []
+        load(autoplay: playing, resumeAt: position)
+    }
+
+    /// The session ended: carry on here from where the receiver was.
+    func castEnded(at position: Double, wasPlaying: Bool) {
+        castSyncTask?.cancel()
+        castQueued = []
+        guard current != nil else { return }
+        currentTime = position
+        load(autoplay: wasPlaying, resumeAt: position)
+    }
+
+    func castLoadFailed() {
+        isLoading = false
+        isPlaying = false
+        wantsPlayback = false
+        updateNowPlaying()
+    }
+
+    /// Loads `song` on the receiver, with the songs after it whose streams are already known; the
+    /// rest are queued by `syncCastUpcoming` once resolved.
+    fileprivate func castLoad(_ song: Song, url: URL, resumeAt: Double) async throws {
+        let cast = CastManager.shared
+        player.pause()
+        // Skipping to a song the receiver already has queued: jump there, it may be preloaded.
+        if cast.isCastingMusic, wantsPlayback, resumeAt < 1, castQueued.contains(song.id), cast.jump(to: song.id) {
+            castQueued = Array(castQueued.drop { $0 != song.id }.dropFirst())
+            isPlaying = true
+            updateNowPlaying()
+            scheduleCastSync()
+            return
+        }
+        let first = try await castItem(song, url: url)
+        var items = [first]
+        for next in castUpcomingSongs() {
+            guard let known = knownStreamURL(for: next), let item = try? await castItem(next, url: known) else { break }
+            items.append(item)
+        }
+        guard !Task.isCancelled, current?.id == song.id, cast.isConnected else { return }
+        playbackLog.info("cast load \(song.id, privacy: .public) at \(resumeAt) with \(items.count - 1) queued")
+        cast.loadMusic(items, position: resumeAt, autoplay: wantsPlayback, repeatOne: repeatMode == .one, rate: rate)
+        castQueued = items.dropFirst().map(\.id)
+        isPlaying = wantsPlayback
+        if !wantsPlayback { isLoading = false }
+        updateNowPlaying()
+        scheduleCastSync()
+    }
+
+    /// The receiver's copy of a song: its stream URL, or for a file on this iPhone (imported or
+    /// downloaded) the proxy's URL for it.
+    private func castItem(_ song: Song, url known: URL? = nil) async throws -> CastItem {
+        var url: URL
+        if let known { url = known } else { url = try await streamURL(for: song).0 }
+        var type = "audio/mp4"
+        var hls = false
+        if url.isFileURL {
+            let endpoint = try await CastManager.shared.proxyEndpoint()
+            type = CastProxyServer.contentType(forExtension: url.pathExtension)
+            url = CastProxyServer.shared.fileURL(for: url, host: endpoint.host, port: endpoint.port)
+        } else if url.host?.hasPrefix("manifest.") == true {
+            // No progressive audio, only HLS (rare): through the proxy for CORS.
+            let endpoint = try await CastManager.shared.proxyEndpoint()
+            type = "application/x-mpegurl"
+            hls = true
+            url = CastProxyServer.shared.playlistURL(for: url, host: endpoint.host, port: endpoint.port)
+        }
+        var item = CastItem(id: song.id, url: url, contentType: type, title: song.title, subtitle: song.artist,
+                            album: song.album, artwork: song.largeArtwork ?? song.artwork, duration: Double(song.duration ?? 0))
+        if hls {
+            item.hlsSegmentFormat = .AAC
+            item.hlsVideoSegmentFormat = .MPEG2_TS
+        }
+        return item
+    }
+
+    /// A stream URL that needs no request: a file, or one resolved recently.
+    private func knownStreamURL(for song: Song) -> URL? {
+        if song.isLocal { return LocalMusicLibrary.fileURL(for: song.id) }
+        if let local = DownloadManager.shared.localURL(for: song.id) { return local }
+        if let cached = resolved[song.id], cached.expires > .now { return cached.url }
+        return nil
+    }
+
+    /// What the receiver should have queued after the current song: up to three, wrapping with repeat
+    /// all, none with repeat one (the receiver repeats the song) or when sleeping at the end of it.
+    private func castUpcomingSongs() -> [Song] {
+        guard repeatMode != .one, !sleepAtEndOfTrack, queue.indices.contains(index) else { return [] }
+        var result: [Song] = []
+        var i = index + 1
+        while result.count < 3 {
+            if i >= queue.count {
+                guard repeatMode == .all else { break }
+                i = 0
+            }
+            if i == index { break }
+            result.append(queue[i])
+            i += 1
+        }
+        return result
+    }
+
+    /// Brings the receiver's queue after the current song in line with Up Next, a moment after the
+    /// queue (or repeat, or the sleep timer) changes.
+    fileprivate func scheduleCastSync() {
+        guard isCastingMusic else { return }
+        castSyncTask?.cancel()
+        castSyncTask = Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            await syncCastUpcoming()
+        }
+    }
+
+    private func syncCastUpcoming() async {
+        let cast = CastManager.shared
+        guard cast.isCastingMusic, let songId = current?.id, cast.lastStatus?.contentID == songId else { return }
+        let wanted = castUpcomingSongs()
+        guard wanted.map(\.id) != castQueued else { return }
+        var items: [CastItem] = []
+        for song in wanted {
+            guard let item = try? await castItem(song) else { break }
+            items.append(item)
+        }
+        guard !Task.isCancelled, cast.isCastingMusic, current?.id == songId, cast.lastStatus?.contentID == songId,
+              items.map(\.id) != castQueued else { return }
+        cast.replaceUpcoming(items)
+        castQueued = items.map(\.id)
+    }
+
+    /// The receiver's status changed: follow it.
+    func castStatusChanged(_ status: CastStatus) {
+        guard isCastingMusic else { return }
+        if let id = status.contentID, id != current?.id {
+            // The receiver went on to a song queued after this one (by itself, or from another sender).
+            // Anything else (or anything while the app loads a song itself) is a stale status from
+            // before the app's own change.
+            guard !isLoading, castQueued.contains(id) else { return }
+            let later = queue.indices.first { $0 > index && queue[$0].id == id }
+            guard let target = later ?? queue.firstIndex(where: { $0.id == id }) else { return }
+            playbackLog.info("cast advanced to \(id, privacy: .public)")
+            commitListening()
+            castQueued = Array(castQueued.drop { $0 != id }.dropFirst())
+            index = target
+            duration = Double(current?.duration ?? 0)
+            currentTime = status.position
+            lastTick = status.position
+            errorMessage = nil
+            saveSession()
+        }
+        switch status.state {
+        case .playing:
+            isPlaying = true
+            isLoading = false
+        case .paused:
+            isPlaying = false
+            isLoading = false
+            wantsPlayback = false
+        case .buffering:
+            break
+        case .idle:
+            switch status.idleReason {
+            case .finished:
+                // With more queued there, the receiver goes on by itself and says so next.
+                guard status.contentID == nil || status.contentID == current?.id, isPlaying || !isLoading,
+                      status.upcoming.isEmpty || castQueued.isEmpty else { break }
+                isLoading = false
+                isPlaying = false
+                trackEnded()
+                return
+            case .error, .cancelled:
+                // Failed (the toast says so), or stopped on the TV or by another sender.
+                isLoading = false
+                isPlaying = false
+                wantsPlayback = false
+            default:
+                break
+            }
+        }
+        if status.state != .idle, status.position.isFinite {
+            currentTime = status.position
+            lastTick = status.position
+        }
+        if (current?.duration ?? 0) == 0, status.duration > 0 { duration = status.duration }
+        updateNowPlaying()
+    }
+
+    /// The position between status updates, twice a second.
+    func castTick(_ position: Double) {
+        guard isCastingMusic, CastManager.shared.lastStatus?.contentID == current?.id, !isLoading else { return }
+        if isPlaying { tick(position) } else { currentTime = position; lastTick = position }
+    }
+}
+

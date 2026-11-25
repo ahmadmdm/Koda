@@ -4,6 +4,7 @@ import SwiftUI
 /// The Liquid Glass bottom accessory above the tab bar, Apple Music style.
 struct MiniPlayer: View {
     @Environment(MusicPlayer.self) private var player
+    @Environment(CastManager.self) private var cast
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
 
     var body: some View {
@@ -13,7 +14,12 @@ struct MiniPlayer: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(player.current?.title ?? String(localized: "Not Playing")).font(.subheadline.weight(.semibold)).lineLimit(1)
                 if placement != .inline {
-                    Text(player.current?.artist ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    if cast.isCastingMusic, let name = cast.deviceName {
+                        Label(name, systemImage: "tv").font(.caption).foregroundStyle(.tint).lineLimit(1)
+                            .accessibilityLabel(Text("Casting to \(name)"))
+                    } else {
+                        Text(player.current?.artist ?? "").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
                 }
             }
             Spacer(minLength: 4)

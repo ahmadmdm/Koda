@@ -55,7 +55,8 @@ final class AppState {
     func showToast(_ key: String.LocalizationValue) {
         let text = String(localized: key)
         toast = text
-        Task { try? await Task.sleep(for: .seconds(2)); if toast == text { toast = nil } }
+        // Longer messages (errors) stay long enough to read.
+        Task { try? await Task.sleep(for: .seconds(text.count > 40 ? 4 : 2)); if toast == text { toast = nil } }
     }
 
     /// Closes the Shorts pager and the watch page; true when either was showing.

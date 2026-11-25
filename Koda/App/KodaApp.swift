@@ -37,6 +37,7 @@ struct KodaApp: App {
                 .environment(downloads)
                 .environment(artworkTint)
                 .environment(AccountModel.shared)
+                .environment(CastManager.shared)
                 .tint(tint)
                 .preferredColorScheme(appearance == "light" ? .light : appearance == "dark" ? .dark : nil)
                 .onOpenURL { app.open(url: $0) }

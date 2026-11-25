@@ -1,0 +1,78 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "NSLocalNetworkUsageDescription": {
+      "comment": "Why the app looks for Cast devices on the local network.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يبحث A! عن أجهزة Chromecast وأجهزة Google Cast الأخرى على شبكة Wi-Fi لديك، لتتمكن من تشغيل الموسيقى والفيديو عليها."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A! looks for Chromecast and other Google Cast devices on your Wi-Fi, so you can play music and videos on them."
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "comment": "Why the app uses the microphone.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم Koda الميكروفون للبحث الصوتي."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koda uses the microphone for voice search."
+          }
+        }
+      }
+    },
+    "NSSiriUsageDescription": {
+      "comment": "Why the app uses Siri.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يمكن لـ Siri تشغيل الأغاني والفنانين والألبومات وقوائم التشغيل في A!، في السيارة أيضًا."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siri can play songs, artists, albums and playlists in A!, also in the car."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "comment": "Why the app uses speech recognition.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يحوّل Koda صوتك إلى عملية بحث."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Koda turns your voice into a search."
+          }
+        }
+      }
+    }
+  }
+}

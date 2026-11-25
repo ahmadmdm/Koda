@@ -27,6 +27,13 @@
 	<string>group.$(KODA_ID_PREFIX)</string>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_googlecast._tcp</string>
+		<string>_CC1AD845._googlecast._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>A! looks for Chromecast and other Google Cast devices on your Wi-Fi, so you can play music and videos on them.</string>
 	<key>NSSiriUsageDescription</key>
 	<string>Siri can play songs, artists, albums and playlists in A!, also in the car.</string>
 	<key>NSSupportsLiveActivities</key>

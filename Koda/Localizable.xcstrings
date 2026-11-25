@@ -6191,6 +6191,176 @@
           }
         }
       }
+    },
+    "Casting to %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يتم الإرسال إلى %@"
+          }
+        }
+      }
+    },
+    "Cast": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إرسال"
+          }
+        }
+      }
+    },
+    "Cast device": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جهاز Cast"
+          }
+        }
+      }
+    },
+    "The Cast device": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جهاز Cast"
+          }
+        }
+      }
+    },
+    "the Cast device": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جهاز Cast"
+          }
+        }
+      }
+    },
+    "Connecting…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جارٍ الاتصال…"
+          }
+        }
+      }
+    },
+    "Stop Casting": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إيقاف الإرسال"
+          }
+        }
+      }
+    },
+    "Cast to a Device": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الإرسال إلى جهاز"
+          }
+        }
+      }
+    },
+    "Back 10 seconds": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "رجوع 10 ثوانٍ"
+          }
+        }
+      }
+    },
+    "Forward 10 seconds": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تقديم 10 ثوانٍ"
+          }
+        }
+      }
+    },
+    "Lost the connection to %@. Playing on this iPhone.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "انقطع الاتصال بـ %@. يستمر التشغيل على هذا الـ iPhone."
+          }
+        }
+      }
+    },
+    "%@ couldn't play this.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر على %@ تشغيل هذا."
+          }
+        }
+      }
+    },
+    "%@ couldn't play %@.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر على %1$@ تشغيل %2$@."
+          }
+        }
+      }
+    },
+    "Couldn't connect to %@.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر الاتصال بـ %@."
+          }
+        }
+      }
+    },
+    "No Cast devices found. Check that this iPhone and the Cast device are on the same Wi-Fi.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لم يُعثر على أجهزة Cast. تأكد من أن هذا الـ iPhone وجهاز Cast متصلان بشبكة Wi-Fi نفسها."
+          }
+        }
+      }
+    },
+    "Connect to the same Wi-Fi as the Cast device.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اتصل بشبكة Wi-Fi نفسها المتصل بها جهاز Cast."
+          }
+        }
+      }
+    },
+    "Couldn't cast this video: %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر إرسال هذا الفيديو: %@"
+          }
+        }
+      }
     }
   }
 }

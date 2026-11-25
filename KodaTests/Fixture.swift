@@ -7,11 +7,11 @@ import Foundation
 enum Fixture {
     private final class Token {}
 
-    static func data(_ name: String) throws -> Data {
+    static func data(_ name: String, extension ext: String = "json") throws -> Data {
         let bundle = Bundle(for: Token.self)
-        guard let url = bundle.url(forResource: name, withExtension: "json")
-            ?? bundle.url(forResource: name, withExtension: "json", subdirectory: "Fixtures") else {
-            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: name + ".json"])
+        guard let url = bundle.url(forResource: name, withExtension: ext)
+            ?? bundle.url(forResource: name, withExtension: ext, subdirectory: "Fixtures") else {
+            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: name + "." + ext])
         }
         return try Data(contentsOf: url)
     }

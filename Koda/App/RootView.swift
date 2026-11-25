@@ -67,16 +67,7 @@ struct RootView: View {
         .fullScreenCover(item: $app.shorts) { ShortsPagerView(launch: $0) }
         // The full-screen player presents its own copy; this one only shows when nothing covers the root.
         .addToPlaylistPresenter(isActive: !app.showPlayer && !video.isPresented && app.shorts == nil)
-        .overlay(alignment: .top) {
-            if let toast = app.toast {
-                Text(toast).font(.subheadline.weight(.medium))
-                    .padding(.horizontal, 18).padding(.vertical, 10)
-                    .glassEffect(.regular, in: .capsule)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.top, 8)
-            }
-        }
-        .animation(.spring(duration: 0.35), value: app.toast)
+        .toastOverlay()
         .task(id: player.current?.id) { await artworkTint.update(from: player.current?.artwork) }
         .task { player.prepareRestoredSession() }
         .modifier(AccountPresenter())

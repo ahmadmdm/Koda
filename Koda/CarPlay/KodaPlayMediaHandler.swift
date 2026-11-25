@@ -203,6 +203,12 @@ private extension String {
 
 /// Hands Siri's play requests to `KodaPlayMediaHandler`.
 final class KodaAppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // Google Cast has to be set up at launch; it doesn't look for devices until the Cast button is tapped.
+        CastManager.setUp()
+        return true
+    }
+
     func application(_ application: UIApplication, handlerFor intent: INIntent) -> Any? {
         intent is INPlayMediaIntent ? KodaPlayMediaHandler.shared : nil
     }

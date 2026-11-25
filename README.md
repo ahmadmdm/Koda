@@ -12,7 +12,8 @@ Open `Koda.xcodeproj` in Xcode 26 or newer and run the `Koda` scheme, or:
 xcodebuild -project Koda.xcodeproj -scheme Koda -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath build build
 ```
 
-No packages, no API key, no account.
+No API key, no account. One Swift package: Google's Cast SDK (`github.com/googlecast/google-cast-ios-sdk`,
+`GoogleCastDynamic`, pinned in `Package.resolved`), which Xcode fetches on the first build.
 
 ### On an iPhone
 
@@ -125,6 +126,12 @@ Ported from the Android app (`docs/identity.md` in the Android repo):
 
 ## More in this version
 
+- **Chromecast** (`Koda/Cast/`): a Cast button beside AirPlay in the player (and in the watch page's menu on iPhone).
+  Songs play on the Default Media Receiver from their m4a stream, with the next three queued there so it carries on
+  while the iPhone sleeps; play, pause, seek, next and the lock screen control the receiver, and ending the session
+  continues on the iPhone where it was. Videos go through a small HTTP proxy in the app (`CastProxyServer`), because
+  googlevideo's HLS has no CORS headers: it rewrites the playlists to H.264 up to 1080p and streams the segments.
+  iOS asks for local network access the first time the Cast button is tapped.
 - **Live Activity**: the song playing on the Lock Screen and in the Dynamic Island, with play/pause and next
   (Settings › Player › Live Activity).
 - **Siri and Shortcuts**: "Play my liked songs in Koda", "Shuffle my library in Koda", "Play ‹playlist› in Koda",

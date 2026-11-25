@@ -14,6 +14,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXBuildFile section */
+		D10000000000000000000001 /* GoogleCastDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = D10000000000000000000002 /* GoogleCastDynamic */; };
 		B1000000000000000000000D /* KodaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -39,7 +40,7 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A10000000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		A10000000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (D10000000000000000000001 /* GoogleCastDynamic in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
 		B10000000000000000000005 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		C10000000000000000000004 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
@@ -58,6 +59,7 @@
 			dependencies = (B1000000000000000000000C);
 			fileSystemSynchronizedGroups = (A10000000000000000000002 /* Koda */, B10000000000000000000003 /* Shared */);
 			name = Koda;
+			packageProductDependencies = (D10000000000000000000002 /* GoogleCastDynamic */);
 			productName = Koda;
 			productReference = A10000000000000000000001 /* Koda.app */;
 			productType = "com.apple.product-type.application";
@@ -98,6 +100,7 @@
 			knownRegions = (en, ar, Base);
 			mainGroup = A10000000000000000000004;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (D10000000000000000000003 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000005 /* Products */;
 			projectDirPath = "";
@@ -301,6 +304,25 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D10000000000000000000003 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlecast/google-cast-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.8.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D10000000000000000000002 /* GoogleCastDynamic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D10000000000000000000003 /* XCRemoteSwiftPackageReference "google-cast-ios-sdk" */;
+			productName = GoogleCastDynamic;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */
 		A1000000000000000000000B = {isa = XCConfigurationList; buildConfigurations = (A1000000000000000000000F, A10000000000000000000010); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };

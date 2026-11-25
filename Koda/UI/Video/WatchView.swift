@@ -133,6 +133,7 @@ struct WatchView: View {
     @Environment(VideoPlayerModel.self) private var model
     @Environment(LibraryStore.self) private var library
     @Environment(AppState.self) private var app
+    @Environment(CastManager.self) private var cast
     @State private var showComments = false
     @State private var showDescription = false
     @State private var showChat = false
@@ -192,6 +193,7 @@ struct WatchView: View {
             PictureAdjustSheet()
         }
         .onChange(of: model.current?.id) { sidePanel = .related }
+        .toastOverlay()
     }
 
     /// Live chat covers the area under the player, or the side column on wide windows.
@@ -210,16 +212,29 @@ struct WatchView: View {
                 .accessibilityLabel("Minimize")
             Spacer()
             TrackMenus()
-            if sizeClass == .regular { PictureMenu() }
+            if sizeClass == .regular {
+                PictureMenu()
+                CastButton()
+                    .frame(width: 40, height: 40)
+                    .padding(6)
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .accessibilityLabel("Cast")
+            }
             Menu {
                 Picker("Quality", selection: $model.quality) { ForEach(VideoQualityCap.allCases) { Text($0.title).tag($0) } }
-                if sizeClass != .regular { PictureMenu(submenu: true) }
+                if sizeClass != .regular {
+                    PictureMenu(submenu: true)
+                    // No room for a seventh button on an iPhone: Cast is in this menu.
+                    Section { CastMenuItems() }
+                }
             } label: {
                 // iPad shows the quality name; iPhone an icon, with Picture inside this menu.
                 if sizeClass == .regular {
                     Label(model.quality.title, systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold)).lineLimit(1).fixedSize()
                 } else {
-                    Image(systemName: "slider.horizontal.3").font(.headline).frame(width: 40, height: 40)
+                    // Tinted while casting, so the state shows without opening the menu.
+                    Image(systemName: cast.isConnected ? "tv" : "slider.horizontal.3").font(.headline).frame(width: 40, height: 40)
+                        .foregroundStyle(cast.isConnected ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 }
             }
             .buttonStyle(.glass)
@@ -238,6 +253,7 @@ struct WatchView: View {
             Color.black
             SystemVideoPlayer(player: model.player)
                 .pictureFilter()
+            if model.isCasting { CastingVideoOverlay() }
             if model.isLoading { ProgressView().tint(.white).controlSize(.large) }
             if let e = model.errorMessage {
                 VStack(spacing: 10) {

@@ -6,6 +6,7 @@ struct PlayerView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(AppState.self) private var app
     @Environment(ArtworkTint.self) private var tint
+    @Environment(CastManager.self) private var cast
     @Environment(\.dismiss) private var dismiss
     @AppStorage("playerStyle") private var styleRaw = PlayerStyle.classic.rawValue
     @State private var showQueue = false
@@ -35,6 +36,7 @@ struct PlayerView: View {
                     } else {
                         styleBody.transition(.opacity)
                     }
+                    CastingLabel().padding(.bottom, Spacing.xs)
                     bottomBar
                 }
             }
@@ -42,6 +44,8 @@ struct PlayerView: View {
         // On a wide layout lyrics and the queue are always beside the artwork, so the Bento tiles pick the panel instead.
         .onChange(of: showLyrics) { _, on in if on && isWide { sidePanel = .lyrics; showLyrics = false } }
         .onChange(of: showQueue) { _, on in if on && isWide { sidePanel = .queue; showQueue = false } }
+        .animation(.smooth, value: cast.isConnected)
+        .toastOverlay()
         .offset(y: dragOffset)
         .gesture(DragGesture().onChanged { v in if v.translation.height > 0 { dragOffset = v.translation.height } }
             .onEnded { v in if v.translation.height > 140 { dismiss() }; withAnimation(.spring) { dragOffset = 0 } })
@@ -99,7 +103,9 @@ struct PlayerView: View {
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 320)
                     Spacer()
+                    CastingLabel()
                     AirPlayGlassButton()
+                    CastGlassButton()
                 }
                 .padding(.horizontal, Spacing.l)
                 Group {
@@ -126,7 +132,10 @@ struct PlayerView: View {
                 .accessibilityLabel("Lyrics")
                 .accessibilityAddTraits(showLyrics ? .isSelected : [])
                 Spacer()
-                AirPlayGlassButton()
+                HStack(spacing: 12) {
+                    AirPlayGlassButton()
+                    CastGlassButton()
+                }
                 Spacer()
                 Button { showQueue = true } label: { Image(systemName: "list.bullet").frame(width: GlassControl.glassIcon, height: GlassControl.glassIcon) }
                     .glassIconButton()

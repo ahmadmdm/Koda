@@ -1,7 +1,9 @@
 import AVFoundation
 import AVKit
+import GoogleCast
 import MediaPlayer
 import Observation
+import os
 import SwiftUI
 import UIKit
 
@@ -97,6 +99,11 @@ final class VideoPlayerModel {
     @ObservationIgnored private var knownDuration: Double = 0
     @ObservationIgnored private var artworkCache: (id: String, artwork: MPMediaItemArtwork)?
     @ObservationIgnored private var artworkLoadingId: String?
+    /// The receiver's position while this video is cast.
+    private(set) var castPosition: Double = 0
+    /// The HLS stream of the current video, for casting it.
+    @ObservationIgnored private var castStream: (id: String, url: URL, isLive: Bool)?
+    @ObservationIgnored private var castTask: Task<Void, Never>?
 
     var library: LibraryStore { .shared }
 
@@ -165,6 +172,8 @@ final class VideoPlayerModel {
 
     func close() {
         saveProgress()
+        if isCasting { CastManager.shared.stopMedia() }
+        castTask?.cancel()
         player.pause()
         player.replaceCurrentItem(with: nil)
         current = nil
@@ -184,17 +193,32 @@ final class VideoPlayerModel {
         guard current != nil else { return }
         NowPlayingOwner.claim(.video)
         if MusicPlayer.shared.isPlaying { MusicPlayer.shared.pause() }
+        if CastManager.shared.isConnected {
+            if isCasting, CastManager.shared.lastStatus?.state != .idle {
+                CastManager.shared.play()
+                isPlaying = true
+                updateNowPlaying()
+            } else {
+                castCurrent(at: stoppedAtEnd ? 0 : elapsed, autoplay: true)
+            }
+            stoppedAtEnd = false
+            return
+        }
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         if stoppedAtEnd { stoppedAtEnd = false; seek(to: 0) }
         player.play()
     }
 
-    func pause() { player.pause() }
+    func pause() {
+        player.pause()
+        if isCasting { CastManager.shared.pause(); isPlaying = false; updateNowPlaying() }
+    }
 
     func togglePlay() { isPlaying ? pause() : play() }
 
     func setRate(_ rate: Float) {
         player.defaultRate = rate
+        if isCasting { CastManager.shared.setRate(rate); return }
         if isPlaying { player.rate = rate }
     }
 
@@ -209,6 +233,8 @@ final class VideoPlayerModel {
     }
 
     private func playbackStateChanged(_ playing: Bool) {
+        // While cast, the paused local player says nothing about playback.
+        guard !isCasting else { return }
         isPlaying = playing
         if playing, !NowPlayingOwner.isVideo, current != nil {
             // Started from the video's own controls while music had Now Playing.
@@ -243,7 +269,7 @@ final class VideoPlayerModel {
                     }
                     guard !Task.isCancelled, current?.id == video.id else { return }
                     // Music started while this loaded: it keeps playing, and the video waits.
-                    if NowPlayingOwner.isVideo { player.play() }
+                    startPlayback()
                     isLoading = false
                     errorMessage = nil
                     if let info = try? await InnerTube.shared.player(videoId: video.id, quick: true), current?.id == video.id {
@@ -253,6 +279,7 @@ final class VideoPlayerModel {
                     let info = try await InnerTube.shared.player(videoId: video.id)
                     guard !Task.isCancelled, current?.id == video.id else { return }
                     guard let url = info.hlsURL else { throw InnerTubeError.noStream }
+                    castStream = (video.id, url, info.isLive)
                     if info.duration > 0 { knownDuration = Double(info.duration) }
                     let item = AVPlayerItem(asset: AVURLAsset(url: url))
                     item.preferredMaximumResolution = quality.size
@@ -265,7 +292,7 @@ final class VideoPlayerModel {
                         await player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
                     }
                     guard !Task.isCancelled, current?.id == video.id else { return }
-                    if NowPlayingOwner.isVideo { player.play() }
+                    startPlayback()
                     isLoading = false
                     errorMessage = nil
                 }
@@ -314,11 +341,15 @@ final class VideoPlayerModel {
     }
 
     private func tick(_ t: Double) {
-        guard t.isFinite else { return }
+        guard t.isFinite, !isCasting else { return }
         updateCaption(t)
+        skipSponsorSegment(at: t)
+    }
+
+    private func skipSponsorSegment(at t: Double) {
         guard !segments.isEmpty, UserDefaults.standard.object(forKey: "sponsorBlock") as? Bool ?? true else { return }
         if let seg = segments.first(where: { t >= $0.start && t < $0.end - 0.5 }) {
-            player.seek(to: CMTime(seconds: seg.end, preferredTimescale: 600))
+            seek(to: seg.end)
             skippedNotice = String(localized: "Skipped \(seg.category.replacingOccurrences(of: "_", with: " "))")
             Task { try? await Task.sleep(for: .seconds(2.5)); skippedNotice = nil }
         }
@@ -423,6 +454,7 @@ final class VideoPlayerModel {
     var nowPlayingChannel: String { details?.channel.name ?? current?.channel ?? "" }
 
     var elapsed: Double {
+        if isCasting { return castPosition }
         let t = player.currentTime().seconds
         return t.isFinite ? max(t, 0) : 0
     }
@@ -575,11 +607,19 @@ final class VideoPlayerModel {
         return cues
     }
 
-    func seek(to seconds: Double) { player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) }
+    func seek(to seconds: Double) {
+        if isCasting {
+            CastManager.shared.seek(to: seconds)
+            castPosition = seconds
+            updateNowPlaying()
+            return
+        }
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+    }
 
     func saveProgress(finished: Bool = false) {
         guard let id = current?.id else { return }
-        let t = player.currentTime().seconds
+        let t = elapsed
         library.savePosition(id, finished ? 0 : (t.isFinite ? t : 0))
     }
 
@@ -614,3 +654,104 @@ final class VideoPlayerModel {
         }
     }
 }
+
+// MARK: Google Cast
+
+extension VideoPlayerModel {
+    /// The receiver plays this video: transport goes there.
+    var isCasting: Bool { CastManager.shared.isCastingVideo(current?.id) }
+
+    /// The loaded video starts: on the receiver while a Cast session is up, else here.
+    fileprivate func startPlayback() {
+        guard NowPlayingOwner.isVideo else { return }
+        if CastManager.shared.isConnected {
+            let t = player.currentTime().seconds
+            castCurrent(at: t.isFinite ? t : 0, autoplay: true)
+        } else {
+            player.play()
+        }
+    }
+
+    /// Plays the current video on the receiver, through the proxy (googlevideo's HLS has no CORS
+    /// headers), from `position` or where it is here.
+    func castCurrent(at position: Double? = nil, autoplay: Bool? = nil) {
+        guard let video = current else { return }
+        let start = position ?? elapsed
+        let play = autoplay ?? (isPlaying || player.timeControlStatus != .paused)
+        player.pause()
+        castTask?.cancel()
+        castTask = Task {
+            do {
+                let stream: (id: String, url: URL, isLive: Bool)
+                if let known = castStream, known.id == video.id {
+                    stream = known
+                } else {
+                    // A downloaded video plays from its file here; the receiver streams it from YouTube.
+                    let info = try await InnerTube.shared.player(videoId: video.id)
+                    guard let url = info.hlsURL else { throw InnerTubeError.noStream }
+                    stream = (video.id, url, info.isLive)
+                    castStream = stream
+                }
+                let endpoint = try await CastManager.shared.proxyEndpoint()
+                guard !Task.isCancelled, current?.id == video.id, CastManager.shared.isConnected else { return }
+                let url = CastProxyServer.shared.playlistURL(for: stream.url, host: endpoint.host, port: endpoint.port)
+                let isLive = stream.isLive || video.isLive
+                // YouTube's HLS: MPEG-TS video segments with separate packed-AAC audio renditions
+                // (checked with curl); live streams mux the audio into the TS segments.
+                let item = CastItem(id: video.id, url: url, contentType: "application/x-mpegurl", title: nowPlayingTitle,
+                                    subtitle: nowPlayingChannel, artwork: video.thumbnailURL, duration: duration,
+                                    isVideo: true, isLive: isLive,
+                                    hlsSegmentFormat: isLive ? .TS : .AAC, hlsVideoSegmentFormat: .MPEG2_TS)
+                CastManager.shared.loadVideo(item, position: start, autoplay: play, rate: player.defaultRate)
+                castPosition = start
+                isPlaying = play
+                isLoading = false
+                updateNowPlaying()
+            } catch {
+                guard !Task.isCancelled, (error as? URLError)?.code != .cancelled else { return }
+                castLog.error("video cast failed: \(String(describing: error), privacy: .public)")
+                AppState.current?.showToast("Couldn't cast this video: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func castStatusChanged(_ status: CastStatus, id: String) {
+        guard isCasting, id == current?.id else { return }
+        switch status.state {
+        case .playing: isPlaying = true
+        case .paused: isPlaying = false
+        case .buffering: break
+        case .idle:
+            isPlaying = false
+            if status.idleReason == .finished {
+                castPosition = 0
+                ended()
+                return
+            }
+        }
+        if status.state != .idle, status.position.isFinite { castPosition = status.position }
+        updateNowPlaying()
+    }
+
+    func castTick(_ position: Double, id: String) {
+        guard isCasting, id == current?.id, isPlaying else { return }
+        castPosition = position
+        skipSponsorSegment(at: position)
+    }
+
+    func castLoadFailed(id: String) {
+        guard id == current?.id else { return }
+        isPlaying = false
+        updateNowPlaying()
+    }
+
+    /// The session ended: the video continues here where the receiver was.
+    func castEnded(id: String, at position: Double, wasPlaying: Bool) {
+        guard id == current?.id else { return }
+        castPosition = 0
+        if position > 0 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
+        if wasPlaying, NowPlayingOwner.isVideo { player.play() } else { isPlaying = false }
+        updateNowPlaying()
+    }
+}
+
