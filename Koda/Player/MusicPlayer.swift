@@ -859,6 +859,12 @@ extension MusicPlayer {
             type = "application/x-mpegurl"
             hls = true
             url = CastProxyServer.shared.playlistURL(for: url, host: endpoint.host, port: endpoint.port)
+        } else {
+            // googlevideo URLs are bound to the address that resolved them: a TV reaching YouTube by
+            // another route (IPv6, a different gateway) gets "error" from the receiver. Tested on a Mi TV:
+            // the direct URL failed, the same stream relayed through the iPhone played at once.
+            let endpoint = try await CastManager.shared.proxyEndpoint()
+            url = CastProxyServer.shared.proxyURL(url, resource: .segment, host: endpoint.host, port: endpoint.port)
         }
         var item = CastItem(id: song.id, url: url, contentType: type, title: song.title, subtitle: song.artist,
                             album: song.album, artwork: song.largeArtwork ?? song.artwork, duration: Double(song.duration ?? 0))
