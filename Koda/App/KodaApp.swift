@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct KodaApp: App {
+    /// Hands Siri's "play … on Koda" requests to `KodaPlayMediaHandler` (Koda/CarPlay/).
+    @UIApplicationDelegateAdaptor(KodaAppDelegate.self) private var appDelegate
     @State private var app = AppState()
     @State private var player = MusicPlayer.shared
     @State private var video = VideoPlayerModel.shared
