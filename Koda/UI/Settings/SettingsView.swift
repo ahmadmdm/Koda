@@ -129,9 +129,10 @@ struct SettingsView: View {
                     Text("Backups include playlists, likes, saved items, statistics, history, subscriptions and hidden items. Downloaded media is not included.")
                 }
             }
-            if matches("about version licence license github") {
+            if matches("about version licence license github diagnostics crash hang report") {
                 Section("About") {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
+                    NavigationLink { DiagnosticsView() } label: { Text("Diagnostics") }
                     Link("Koda on GitHub", destination: URL(string: "https://github.com/Ivorisnoob/Koda")!)
                     Link("Lyrics by LRCLIB", destination: URL(string: "https://lrclib.net")!)
                     Text("Koda is not affiliated with YouTube or Google. Streams are fetched directly from YouTube without an API key.")

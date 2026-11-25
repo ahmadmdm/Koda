@@ -36,6 +36,10 @@ nonisolated enum MusicAPI {
         } else {
             root = try await api.music("search", ["query": query, "params": filter.params])
         }
+        return parseSearch(root)
+    }
+
+    static func parseSearch(_ root: J) -> ([MusicCard], String?) {
         let items = root.findAll("musicResponsiveListItemRenderer").compactMap(parseListItem)
         let next = root.findAll("nextContinuationData").first?["continuation"].string
             ?? root.findAll("continuationCommand").first?["token"].string
@@ -51,6 +55,10 @@ nonisolated enum MusicAPI {
 
     static func home(continuation: String? = nil) async throws -> MusicHome {
         let root = try await api.music("browse", continuation == nil ? ["browseId": "FEmusic_home"] : ["continuation": continuation!])
+        return parseHome(root)
+    }
+
+    static func parseHome(_ root: J) -> MusicHome {
         let shelves = root.findAll("musicCarouselShelfRenderer").compactMap(parseCarousel)
         let next = root.findAll("nextContinuationData").first?["continuation"].string
         return MusicHome(shelves: shelves, continuation: next)
@@ -69,6 +77,10 @@ nonisolated enum MusicAPI {
     static func collection(_ browseId: String) async throws -> CollectionPage {
         let id = browseId.hasPrefix("VL") || browseId.hasPrefix("MPRE") || browseId.hasPrefix("FE") ? browseId : "VL" + browseId
         let root = try await api.music("browse", ["browseId": id])
+        return parseCollection(root, id: id)
+    }
+
+    static func parseCollection(_ root: J, id: String) -> CollectionPage {
         let header = root.first("musicResponsiveHeaderRenderer").exists ? root.first("musicResponsiveHeaderRenderer")
             : root.first("musicDetailHeaderRenderer").exists ? root.first("musicDetailHeaderRenderer")
             : root.first("musicEditablePlaylistDetailHeaderRenderer")
@@ -100,6 +112,10 @@ nonisolated enum MusicAPI {
 
     static func artist(_ browseId: String) async throws -> ArtistPage {
         let root = try await api.music("browse", ["browseId": browseId])
+        return parseArtist(root, browseId: browseId)
+    }
+
+    static func parseArtist(_ root: J, browseId: String) -> ArtistPage {
         let header = root.first("musicImmersiveHeaderRenderer").exists ? root.first("musicImmersiveHeaderRenderer") : root.first("musicVisualHeaderRenderer")
         let songs = root.findAll("musicShelfRenderer").first.map { shelf in
             shelf.findAll("musicResponsiveListItemRenderer").compactMap { parseListItem($0)?.song }
@@ -118,7 +134,11 @@ nonisolated enum MusicAPI {
 
     static func radio(for videoId: String, playlistId: String? = nil) async throws -> [Song] {
         let root = try await api.music("next", ["videoId": videoId, "playlistId": playlistId ?? "RDAMVM\(videoId)", "isAudioOnly": true])
-        return root.findAll("playlistPanelVideoRenderer").compactMap(parsePanelItem).filter(isMusicForRadio)
+        return parseRadio(root)
+    }
+
+    static func parseRadio(_ root: J) -> [Song] {
+        root.findAll("playlistPanelVideoRenderer").compactMap(parsePanelItem).filter(isMusicForRadio)
     }
 
     /// Radio and Quick picks should be music. YouTube's "up next" can drift into user uploads such as

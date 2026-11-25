@@ -12,6 +12,10 @@ struct KodaApp: App {
     @AppStorage("palette") private var palette = Palette.violet.rawValue
     @AppStorage("onboarded") private var onboarded = false
 
+    init() {
+        Diagnostics.shared.start()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
