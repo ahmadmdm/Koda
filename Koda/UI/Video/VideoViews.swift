@@ -67,10 +67,10 @@ struct VideoCard: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if let entry = library.data.videoHistory.first(where: { $0.video.id == video.id }), entry.position > 0,
-                   let total = video.durationText?.durationSeconds, total > 0 {
+                if let entry = library.data.videoHistory.first(where: { $0.video.id == video.id }),
+                   let fraction = WatchProgress.fraction(of: entry) {
                     GeometryReader { g in
-                        Rectangle().fill(.red).frame(width: g.size.width * min(entry.position / Double(total), 1), height: 3)
+                        Rectangle().fill(.red).frame(width: g.size.width * fraction, height: 3)
                     }
                     .frame(height: 3)
                     .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: compact ? 10 : 16, bottomTrailingRadius: compact ? 10 : 16))
@@ -88,7 +88,8 @@ struct VideoCard: View {
         Button(library.isInWatchLater(video.id) ? "Remove from Watch Later" : "Watch Later", systemImage: "clock") { library.toggleWatchLater(video) }
         Button("Play as Audio", systemImage: "headphones") { MusicPlayer.shared.play([video.asSong], radio: true) }
         Button("Add Audio to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { MusicPlayer.shared.addToQueue([video.asSong]) }
-        if downloads.isDownloaded(video.id) {
+        if let item = downloads.items.first(where: { $0.id == video.id }) {
+            VideoExportButtons(item: item)
             Button("Remove Download", systemImage: "trash") { downloads.delete(video.id) }
         } else if downloads.isInProgress(video.id) {
             Button("Cancel Download", systemImage: "xmark.circle") { downloads.cancel(video.id) }
@@ -136,7 +137,7 @@ struct VideoHomeView: View {
                         .padding(.horizontal)
                     }
                 }
-                let continueWatching = library.data.videoHistory.filter { $0.position > 30 }.prefix(10)
+                let continueWatching = WatchProgress.continueWatching(library.data.videoHistory.filter { !library.isHidden($0.video) })
                 if topic == VideoTopic.all[0], !continueWatching.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Continue watching").font(.title3.bold()).padding(.horizontal)
@@ -428,14 +429,21 @@ struct SubscriptionsView: View {
     @State private var loadStamp: LoadStamp?
     @State private var channelFilter: String?
     @State private var maxAgeDays = 0
+    /// When each feed video went up: RSS's exact date, else worked out from the account feed's
+    /// "3 hours ago".
+    @State private var dates: [String: Date] = [:]
+
+    /// The device's follows and the active account's channels.
+    private var follows: [ChannelSummary] { library.subscriptions(for: account.active) }
 
     var body: some View {
+        let follows = follows
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
-                if !library.data.subscriptions.isEmpty {
+                if !follows.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 14) {
-                            ForEach(library.data.subscriptions) { c in
+                            ForEach(follows) { c in
                                 Button { channelFilter = channelFilter == c.id ? nil : c.id } label: {
                                     VStack {
                                         Artwork(url: c.avatar.flatMap(URL.init(string:)), cornerRadius: 30, placeholderIcon: "person.fill").frame(width: 60, height: 60)
@@ -449,8 +457,7 @@ struct SubscriptionsView: View {
                         .padding(.horizontal)
                     }
                 }
-                let cutoff = maxAgeDays > 0 ? Calendar.current.date(byAdding: .day, value: -maxAgeDays, to: .now) : nil
-                let visible = feed.filter { (channelFilter == nil || $0.channelId == channelFilter) && (cutoff == nil || ($0.publishedDate ?? .now) >= cutoff!) }
+                let visible = Self.filter(feed, channel: channelFilter, maxAgeDays: maxAgeDays, dates: dates)
                 VideoGrid(videos: visible, spacing: 20)
                 if loading && feed.isEmpty { LoadingView() }
                 if !loading && loaded && hasFollows {
@@ -482,21 +489,35 @@ struct SubscriptionsView: View {
             }
         }
         .refreshable { await load() }
-        .task(id: "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")") {
+        .onChange(of: account.active?.id) { channelFilter = nil }
+        .task(id: "\(follows.count)|\(account.active?.id.uuidString ?? "")") {
             // One RSS request per followed channel: don't send them all again on every return to this tab.
-            let key = "\(library.data.subscriptions.count)|\(account.active?.id.uuidString ?? "")"
+            let key = "\(follows.count)|\(account.active?.id.uuidString ?? "")"
             guard loadStamp?.isFresh(for: key) != true else { return }
             await load()
             if !Task.isCancelled, !feed.isEmpty { loadStamp = LoadStamp(key: key) }
         }
     }
 
-    private var hasFollows: Bool { !library.data.subscriptions.isEmpty || account.isSignedIn }
+    private var hasFollows: Bool { !follows.isEmpty || account.isSignedIn }
+
+    /// The feed narrowed to one channel and to uploads newer than `maxAgeDays` (0: any time).
+    /// A video whose date is unknown is left out once an age is chosen.
+    static func filter(_ feed: [Video], channel: String?, maxAgeDays: Int, dates: [String: Date], now: Date = .now) -> [Video] {
+        let cutoff = maxAgeDays > 0 ? Calendar.current.date(byAdding: .day, value: -maxAgeDays, to: now) : nil
+        return feed.filter { v in
+            guard channel == nil || v.channelId == channel else { return false }
+            guard let cutoff else { return true }
+            guard let date = dates[v.id] ?? v.publishedDate else { return false }
+            return date >= cutoff
+        }
+    }
 
     private func load() async {
         loading = true; defer { loading = false; loaded = true }
-        let ids = library.data.subscriptions.map(\.id)
-        let avatars = Dictionary(library.data.subscriptions.map { ($0.id, $0.avatar) }, uniquingKeysWith: { a, _ in a })
+        let follows = follows
+        let ids = follows.map(\.id)
+        let avatars = Dictionary(follows.map { ($0.id, $0.avatar) }, uniquingKeysWith: { a, _ in a })
         var all: [Video] = []
         await withTaskGroup(of: [Video].self) { group in
             for id in ids { group.addTask { await VideoAPI.rssFeed(channelId: id) } }
@@ -511,14 +532,19 @@ struct SubscriptionsView: View {
         // follows from RSS carry dates and follow it, newest first.
         feed = feed.filter { $0.publishedDate == nil }
             + feed.filter { $0.publishedDate != nil }.sorted { $0.publishedDate! > $1.publishedDate! }
+        let now = Date.now
+        dates = Dictionary(feed.compactMap { v in (v.publishedDate ?? PublishedDate.parse(v.published, now: now)).map { (v.id, $0) } },
+                           uniquingKeysWith: { a, _ in a })
     }
 }
 
 struct ManageSubscriptionsView: View {
     @Environment(LibraryStore.self) private var library
+    @Environment(AccountModel.self) private var account
     var body: some View {
+        let follows = library.subscriptions(for: account.active)
         List {
-            ForEach(library.data.subscriptions) { c in
+            ForEach(follows) { c in
                 NavigationLink(value: Route.channel(c.id)) {
                     HStack {
                         Artwork(url: c.avatar.flatMap(URL.init(string:)), cornerRadius: 20, placeholderIcon: "person.fill").frame(width: 40, height: 40)
@@ -526,7 +552,7 @@ struct ManageSubscriptionsView: View {
                     }
                 }
             }
-            .onDelete { library.data.subscriptions.remove(atOffsets: $0) }
+            .onDelete { idx in idx.map { follows[$0].id }.forEach { library.unsubscribe($0) } }
         }
         .navigationTitle("Subscriptions")
         .toolbar { EditButton() }
@@ -595,7 +621,7 @@ struct VideoLibraryView: View {
                 link(.watchLater, "Watch Later", "clock.badge.checkmark.fill", .blue, library.data.watchLater.count)
                 link(.likedVideos, "Liked videos", "hand.thumbsup.fill", .pink, library.data.likedVideos.count)
                 link(.videoDownloads, "Downloads", "arrow.down.circle.fill", .indigo, VideoDownloadManager.shared.items.count)
-                link(.subscriptionsManage, "Subscriptions", "person.2.fill", .green, library.data.subscriptions.count)
+                link(.subscriptionsManage, "Subscriptions", "person.2.fill", .green, library.subscriptions(for: account.active).count)
                 link(.hidden, "Hidden & blocked", "eye.slash.fill", .gray, library.data.hiddenChannels.count + library.data.hiddenVideos.count)
             }
             if !library.data.videoHistory.isEmpty {

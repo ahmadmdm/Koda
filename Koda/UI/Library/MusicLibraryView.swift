@@ -251,8 +251,13 @@ struct DownloadsView: View {
             }
             Section {
                 CollectionActions(songs: songs).listRowBackground(Color.clear)
-                ForEach(Array(songs.enumerated()), id: \.element.id) { i, s in SongRow(song: s) { player.play(songs, startAt: i) } }
-                    .onDelete { idx in idx.map { songs[$0].id }.forEach(downloads.delete) }
+                ForEach(Array(songs.enumerated()), id: \.element.id) { i, s in
+                    SongRow(song: s) { player.play(songs, startAt: i) }
+                        .swipeActions(edge: .leading) {
+                            Button("Save to Files…", systemImage: "folder") { MediaExporter.shared.saveToFiles(s) }.tint(.blue)
+                        }
+                }
+                .onDelete { idx in idx.map { songs[$0].id }.forEach(downloads.delete) }
             } footer: {
                 Text("\(songs.count) songs • \(ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file)) on this iPhone")
             }

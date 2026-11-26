@@ -838,6 +838,26 @@
         }
       }
     },
+    "Allow A! to add to Photos in Settings › Privacy & Security › Photos.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اسمح لـ A! بالإضافة إلى الصور من الإعدادات › الخصوصية والأمن › الصور."
+          }
+        }
+      }
+    },
+    "Another file is being saved.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يجري حفظ ملف آخر."
+          }
+        }
+      }
+    },
     "API key": {
       "localizations": {
         "ar": {
@@ -1612,6 +1632,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "تعذّر تحميل اشتراكاتك. تحقق من اتصالك وحاول مرة أخرى."
+          }
+        }
+      }
+    },
+    "Couldn't save: %@": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر الحفظ: %@"
           }
         }
       }
@@ -3158,6 +3188,16 @@
         }
       }
     },
+    "Only downloads in H.264 (up to 1080p) can be saved as a file. Download the video again in 1080p or lower.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يمكن حفظ التنزيلات بترميز H.264 (حتى 1080p) فقط كملف. نزّل الفيديو مرة أخرى بدقة 1080p أو أقل."
+          }
+        }
+      }
+    },
     "Open Koda to start the music.": {
       "localizations": {
         "ar": {
@@ -3596,6 +3636,16 @@
         }
       }
     },
+    "Preparing file…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جارٍ تجهيز الملف…"
+          }
+        }
+      }
+    },
     "Preset": {
       "localizations": {
         "ar": {
@@ -3922,6 +3972,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "قوي"
+          }
+        }
+      }
+    },
+    "Save to Files…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حفظ في الملفات…"
+          }
+        }
+      }
+    },
+    "Save to Photos": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حفظ في الصور"
+          }
+        }
+      }
+    },
+    "Saved to Files": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم الحفظ في الملفات"
+          }
+        }
+      }
+    },
+    "Saved to Photos": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تم الحفظ في الصور"
+          }
+        }
+      }
+    },
+    "Saving to Photos…": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "جارٍ الحفظ في الصور…"
           }
         }
       }
@@ -4726,6 +4826,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "قائمة التشغيل هذه لا تحتوي على أغانٍ."
+          }
+        }
+      }
+    },
+    "The download couldn't be found.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "تعذّر العثور على التنزيل."
           }
         }
       }

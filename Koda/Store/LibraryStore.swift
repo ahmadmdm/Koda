@@ -30,6 +30,8 @@ nonisolated struct VideoEntry: Codable, Hashable, Identifiable, Sendable {
     var video: Video
     var date: Date
     var position: Double = 0
+    /// The video's length when it was last watched (seconds); older entries have none.
+    var duration: Double? = nil
 }
 
 /// Everything Koda keeps on the device. One Codable document so backup and
@@ -84,6 +86,14 @@ final class LibraryStore {
         } else {
             data = LibraryData()
         }
+    }
+
+    /// Writes the library now, for when the app leaves the screen or quits: the scheduled
+    /// save may not get its turn before the process is suspended.
+    func flush() {
+        saveTask?.cancel()
+        saveTask = nil
+        if let encoded = try? JSONEncoder().encode(data) { try? encoded.write(to: url, options: .atomic) }
     }
 
     private func scheduleSave() {
@@ -237,15 +247,47 @@ final class LibraryStore {
 
     // MARK: Video
 
-    func recordWatch(_ video: Video, position: Double = 0) {
+    /// Puts the video at the top of the history. Its saved position and length stay, and what the
+    /// new value doesn't know (a link opens with no title) is kept from the old entry.
+    func recordWatch(_ video: Video) {
+        let old = data.videoHistory.first { $0.video.id == video.id }
+        var entry = VideoEntry(video: video, date: .now, position: old?.position ?? 0, duration: old?.duration)
+        if let old { entry.video = Self.merged(video, keeping: old.video) }
         data.videoHistory.removeAll { $0.video.id == video.id }
-        data.videoHistory.insert(VideoEntry(video: video, date: .now, position: position), at: 0)
+        data.videoHistory.insert(entry, at: 0)
         if data.videoHistory.count > 500 { data.videoHistory.removeLast() }
     }
 
-    func savePosition(_ videoId: String, _ position: Double) {
+    /// Fills in the history entry's title, channel and picture once the player knows them.
+    func updateWatchedVideo(_ video: Video) {
+        guard let i = data.videoHistory.firstIndex(where: { $0.video.id == video.id }) else { return }
+        let merged = Self.merged(video, keeping: data.videoHistory[i].video)
+        if merged != data.videoHistory[i].video { data.videoHistory[i].video = merged }
+    }
+
+    /// `video`, with the empty or missing fields taken from `old`.
+    nonisolated static func merged(_ video: Video, keeping old: Video) -> Video {
+        var v = video
+        if v.title.isEmpty { v.title = old.title }
+        if v.channel.isEmpty { v.channel = old.channel }
+        v.channelId = v.channelId ?? old.channelId
+        v.channelAvatar = v.channelAvatar ?? old.channelAvatar
+        v.thumbnail = v.thumbnail ?? old.thumbnail
+        v.durationText = v.durationText ?? old.durationText
+        v.views = v.views ?? old.views
+        v.published = v.published ?? old.published
+        return v
+    }
+
+    func savePosition(_ videoId: String, _ position: Double, duration: Double? = nil) {
         guard let i = data.videoHistory.firstIndex(where: { $0.video.id == videoId }) else { return }
-        data.videoHistory[i].position = position
+        let length = duration.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? data.videoHistory[i].duration
+        // Unchanged (paused, or saved twice): leave the library, and its save and redraw, alone.
+        guard abs(data.videoHistory[i].position - position) >= 0.5 || length != data.videoHistory[i].duration else { return }
+        var entry = data.videoHistory[i]
+        entry.position = position
+        entry.duration = length
+        data.videoHistory[i] = entry
     }
 
     func isInWatchLater(_ id: String) -> Bool { data.watchLater.contains { $0.video.id == id } }
@@ -265,12 +307,44 @@ final class LibraryStore {
         Task { _ = await AccountAPI.setVideoLiked(v.id, liked) }
     }
 
-    func isSubscribed(_ channelId: String) -> Bool { data.subscriptions.contains { $0.id == channelId } }
+    /// The active account, as followed channels are tagged with it.
+    private var accountKey: String? { AccountSession.shared.active?.id.uuidString }
+
+    /// The followed channels to show: the device's own and the active account's (pass
+    /// `AccountModel.active`, so the view redraws when the account changes).
+    func subscriptions(for account: YouTubeAccount?) -> [ChannelSummary] {
+        FollowedChannels.visible(data.subscriptions, account: account?.id.uuidString)
+    }
+
+    func isSubscribed(_ channelId: String) -> Bool {
+        let key = accountKey
+        return data.subscriptions.contains { $0.id == channelId && $0.isFollowed(by: key) }
+    }
+
     func toggleSubscription(_ channel: ChannelSummary) {
-        let subscribed: Bool
-        if let i = data.subscriptions.firstIndex(where: { $0.id == channel.id }) { data.subscriptions.remove(at: i); subscribed = false }
-        else { data.subscriptions.insert(channel, at: 0); subscribed = true }
+        let subscribed = !isSubscribed(channel.id)
+        if subscribed { data.subscriptions = FollowedChannels.subscribing(channel, account: accountKey, into: data.subscriptions) }
+        else { unsubscribe(channel.id, sync: false) }
         Task { _ = await AccountAPI.setSubscribed(channel.id, subscribed) }
+    }
+
+    /// Unfollows on the device and, when signed in, on the active account.
+    func unsubscribe(_ channelId: String, sync: Bool = true) {
+        data.subscriptions = FollowedChannels.unsubscribing(channelId, account: accountKey, from: data.subscriptions)
+        if sync { Task { _ = await AccountAPI.setSubscribed(channelId, false) } }
+    }
+
+    /// The channels an account subscribes to, fetched as that account.
+    func importSubscriptions(_ channels: [ChannelSummary], account: UUID, complete: Bool) {
+        let updated = FollowedChannels.importing(channels, for: account.uuidString, complete: complete, into: data.subscriptions)
+        // Usually nothing changed: leave the library (and its save and redraw) alone then.
+        if updated != data.subscriptions { data.subscriptions = updated }
+    }
+
+    /// Signed out of these accounts: their channels leave the list.
+    func forgetSubscriptions(of accounts: Set<UUID>) {
+        let updated = FollowedChannels.forgetting(accounts: Set(accounts.map(\.uuidString)), in: data.subscriptions)
+        if updated != data.subscriptions { data.subscriptions = updated }
     }
 
     func hideChannel(_ channel: ChannelSummary) {

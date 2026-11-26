@@ -104,6 +104,20 @@ nonisolated struct ChannelSummary: Codable, Hashable, Identifiable, Sendable {
     var name: String
     var avatar: String?
     var subscribers: String?
+    /// For a followed channel: the signed-in accounts (`YouTubeAccount.id`) subscribed to it.
+    /// Absent in libraries from before accounts were told apart.
+    var accounts: [String]? = nil
+    /// For a followed channel: followed on this iPhone, without an account. Absent (with no
+    /// accounts) in older libraries, where every follow counts as the device's own.
+    var onDevice: Bool? = nil
+
+    /// A follow of the device's own, shown whichever account is active, or none.
+    var isDeviceFollow: Bool { onDevice ?? (accounts ?? []).isEmpty }
+
+    /// Shown in Subscriptions while `account` (nil: signed out) is active.
+    func isFollowed(by account: String?) -> Bool {
+        isDeviceFollow || account.map { (accounts ?? []).contains($0) } ?? false
+    }
 }
 
 nonisolated struct VideoPlaylistSummary: Hashable, Identifiable, Sendable {

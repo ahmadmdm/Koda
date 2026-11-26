@@ -38,6 +38,24 @@
         }
       }
     },
+    "NSPhotoLibraryAddUsageDescription": {
+      "comment": "Why the app asks to add videos to the photo library.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يحفظ A! مقاطع الفيديو التي نزّلتها في الصور عندما تطلب ذلك."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A! saves the videos you download to Photos when you ask it to."
+          }
+        }
+      }
+    },
     "NSSiriUsageDescription": {
       "comment": "Why the app uses Siri.",
       "extractionState": "manual",

@@ -104,6 +104,13 @@ final class VideoPlayerModel {
     /// The HLS stream of the current video, for casting it.
     @ObservationIgnored private var castStream: (id: String, url: URL, isLive: Bool)?
     @ObservationIgnored private var castTask: Task<Void, Never>?
+    /// The video whose position is being kept: set once it has started where it left off, so a
+    /// half-loaded item (at 0) never overwrites the saved position.
+    @ObservationIgnored private var trackingId: String?
+    /// The position saved for the current video when it was opened.
+    @ObservationIgnored private var resumeAt: Double = 0
+    @ObservationIgnored private var lastProgressSave = Date.distantPast
+    @ObservationIgnored private var lifecycleObservers: [NSObjectProtocol] = []
 
     var library: LibraryStore { .shared }
 
@@ -139,6 +146,15 @@ final class VideoPlayerModel {
                 self.ended()
             }
         }
+        // Leaving the screen or quitting: keep where the video was, and write it now.
+        for name in [UIApplication.didEnterBackgroundNotification, UIApplication.willTerminateNotification] {
+            lifecycleObservers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.saveProgress()
+                    LibraryStore.shared.flush()
+                }
+            })
+        }
     }
 
     func open(_ video: Video, queue: [Video] = []) {
@@ -150,6 +166,7 @@ final class VideoPlayerModel {
         MusicPlayer.shared.pause()
         if current?.id == video.id { isPresented = true; return }
         saveProgress()
+        trackingId = nil
         playingFromUserQueue = fromUserQueue
         stoppedAtEnd = false
         knownDuration = video.durationText?.durationSeconds.map(Double.init) ?? 0
@@ -165,6 +182,7 @@ final class VideoPlayerModel {
         currentCaption = nil
         if !queue.isEmpty { self.queue = queue.filter { $0.id != video.id } }
         isPresented = true
+        resumeAt = library.data.videoHistory.first { $0.video.id == video.id }?.position ?? 0
         library.recordWatch(video)
         load(video)
         updateNowPlaying()
@@ -172,6 +190,7 @@ final class VideoPlayerModel {
 
     func close() {
         saveProgress()
+        trackingId = nil
         if isCasting { CastManager.shared.stopMedia() }
         castTask?.cancel()
         player.pause()
@@ -205,7 +224,7 @@ final class VideoPlayerModel {
             return
         }
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-        if stoppedAtEnd { stoppedAtEnd = false; seek(to: 0) }
+        if stoppedAtEnd { stoppedAtEnd = false; seek(to: 0); trackingId = current?.id }
         player.play()
     }
 
@@ -236,6 +255,7 @@ final class VideoPlayerModel {
         // While cast, the paused local player says nothing about playback.
         guard !isCasting else { return }
         isPlaying = playing
+        if !playing { saveProgress() }
         if playing, !NowPlayingOwner.isVideo, current != nil {
             // Started from the video's own controls while music had Now Playing.
             NowPlayingOwner.claim(.video)
@@ -247,6 +267,7 @@ final class VideoPlayerModel {
     private func load(_ video: Video) {
         loadTask?.cancel()
         isLoading = true
+        trackingId = nil
         player.replaceCurrentItem(with: nil)
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         loadTask = Task {
@@ -262,18 +283,17 @@ final class VideoPlayerModel {
                     player.replaceCurrentItem(with: item)
                     await loadAudioTracks(item, originalLanguage: nil)
                     let duration = (try? await asset.load(.duration).seconds) ?? 0
-                    if duration > 0 { knownDuration = duration }
-                    let resume = library.data.videoHistory.first { $0.video.id == video.id }?.position ?? 0
-                    if resume > 10, duration - resume > 20 {
-                        await player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
-                    }
+                    if duration.isFinite, duration > 0 { knownDuration = duration }
+                    let start = await resumePosition(item, videoId: video.id, isLive: false)
                     guard !Task.isCancelled, current?.id == video.id else { return }
                     // Music started while this loaded: it keeps playing, and the video waits.
-                    startPlayback()
+                    startPlayback(at: start)
+                    trackingId = video.id
                     isLoading = false
                     errorMessage = nil
                     if let info = try? await InnerTube.shared.player(videoId: video.id, quick: true), current?.id == video.id {
                         applyCaptions(info.captions)
+                        fillIn(title: info.title, channel: info.author, thumbnail: info.thumbnail, duration: info.duration)
                     }
                 } else {
                     let info = try await InnerTube.shared.player(videoId: video.id)
@@ -281,18 +301,18 @@ final class VideoPlayerModel {
                     guard let url = info.hlsURL else { throw InnerTubeError.noStream }
                     castStream = (video.id, url, info.isLive)
                     if info.duration > 0 { knownDuration = Double(info.duration) }
+                    // A link opens with only the video's id: name it in the history now.
+                    fillIn(title: info.title, channel: info.author, thumbnail: info.thumbnail, duration: info.isLive ? nil : info.duration)
                     let item = AVPlayerItem(asset: AVURLAsset(url: url))
                     item.preferredMaximumResolution = quality.size
                     item.externalMetadata = Self.metadata(title: info.title, artist: info.author)
                     player.replaceCurrentItem(with: item)
                     applyCaptions(info.captions)
                     await loadAudioTracks(item, originalLanguage: info.originalAudioLanguage)
-                    let resume = library.data.videoHistory.first { $0.video.id == video.id }?.position ?? 0
-                    if resume > 10, info.duration - resume > 20 {
-                        await player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
-                    }
+                    let start = await resumePosition(item, videoId: video.id, isLive: info.isLive || video.isLive)
                     guard !Task.isCancelled, current?.id == video.id else { return }
-                    startPlayback()
+                    startPlayback(at: start)
+                    trackingId = video.id
                     isLoading = false
                     errorMessage = nil
                 }
@@ -310,16 +330,46 @@ final class VideoPlayerModel {
             if let d {
                 details = d
                 chapters = Self.parseChapters(d.description)
-                if current?.channelId == nil || current?.channelAvatar == nil {
-                    current?.channelId = d.channel.id
-                    current?.channelAvatar = d.channel.avatar
-                    if let c = current { library.recordWatch(c) }
-                }
+                fillIn(title: d.title, channel: d.channel.name, channelId: d.channel.id, avatar: d.channel.avatar)
                 if queue.isEmpty { queue = library.filtered(d.related) }
             }
             segments = s
             updateNowPlaying()
         }
+    }
+
+    /// Waits until the item can seek (a seek sent earlier can be dropped), then moves to where the
+    /// video was left. Returns the position it starts from.
+    private func resumePosition(_ item: AVPlayerItem, videoId: String, isLive: Bool) async -> Double {
+        guard !isLive, resumeAt > 0 else { return 0 }
+        var waited = 0
+        while item.status == .unknown, waited < 300, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(50))
+            waited += 1
+        }
+        guard !Task.isCancelled, current?.id == videoId, player.currentItem === item,
+              let target = WatchProgress.resumePosition(saved: resumeAt, duration: duration) else { return 0 }
+        if item.status == .readyToPlay {
+            await player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        }
+        return target
+    }
+
+    /// Fills in what the current video was opened without (a link has only its id), here and in
+    /// the history.
+    private func fillIn(title: String?, channel: String?, channelId: String? = nil, avatar: String? = nil,
+                        thumbnail: String? = nil, duration: Double? = nil) {
+        guard var v = current else { return }
+        let old = v
+        if v.title.isEmpty, let title, !title.isEmpty { v.title = title }
+        if v.channel.isEmpty, let channel, !channel.isEmpty { v.channel = channel }
+        if v.channelId == nil { v.channelId = channelId }
+        if v.channelAvatar == nil { v.channelAvatar = avatar }
+        if v.thumbnail == nil { v.thumbnail = thumbnail }
+        if v.durationText == nil, let duration { v.durationText = WatchProgress.durationText(duration) }
+        guard v != old else { return }
+        current = v
+        library.updateWatchedVideo(v)
     }
 
     private func applyCaptions(_ captions: [CaptionTrack]) {
@@ -344,6 +394,7 @@ final class VideoPlayerModel {
         guard t.isFinite, !isCasting else { return }
         updateCaption(t)
         skipSponsorSegment(at: t)
+        saveProgressPeriodically()
     }
 
     private func skipSponsorSegment(at t: Double) {
@@ -357,6 +408,8 @@ final class VideoPlayerModel {
 
     private func ended() {
         saveProgress(finished: true)
+        // Watched to the end: nothing more to keep for it, until it plays again.
+        trackingId = nil
         // The viewer's queue plays whatever the autoplay setting says.
         if !userQueue.isEmpty { playNext(); return }
         // It ran out: stop, rather than carry on with a related video.
@@ -375,6 +428,8 @@ final class VideoPlayerModel {
     var autoNext: Video? { userQueue.isEmpty && !playingFromUserQueue ? queue.first : nil }
 
     func playNext() {
+        // Keep the position of the video being left: `current` is cleared below.
+        saveProgress()
         if !userQueue.isEmpty {
             playFromUserQueue(userQueue.removeFirst())
             return
@@ -433,6 +488,7 @@ final class VideoPlayerModel {
     private func playFromUserQueue(_ video: Video) {
         // Up next is rebuilt from this video's related videos.
         queue = []
+        saveProgress()
         if current?.id == video.id { current = nil }
         open(video, queue: [], fromUserQueue: true)
     }
@@ -617,10 +673,22 @@ final class VideoPlayerModel {
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
     }
 
+    /// Keeps where the current video is. A finished video starts over next time.
     func saveProgress(finished: Bool = false) {
-        guard let id = current?.id else { return }
+        guard let video = current else { return }
+        if finished || stoppedAtEnd { library.savePosition(video.id, 0); return }
+        // Before the video has started where it was, its position is 0 and says nothing.
+        guard trackingId == video.id, !video.isLive, player.currentItem?.duration.isIndefinite != true || isCasting else { return }
+        lastProgressSave = .now
         let t = elapsed
-        library.savePosition(id, finished ? 0 : (t.isFinite ? t : 0))
+        guard t.isFinite else { return }
+        library.savePosition(video.id, t, duration: duration)
+    }
+
+    /// While playing, the position is written every few seconds, so it survives a crash.
+    private func saveProgressPeriodically() {
+        guard isPlaying, Date.now.timeIntervalSince(lastProgressSave) >= WatchProgress.saveInterval else { return }
+        saveProgress()
     }
 
     private static func metadata(title: String, artist: String) -> [AVMetadataItem] {
@@ -662,11 +730,11 @@ extension VideoPlayerModel {
     var isCasting: Bool { CastManager.shared.isCastingVideo(current?.id) }
 
     /// The loaded video starts: on the receiver while a Cast session is up, else here.
-    fileprivate func startPlayback() {
+    fileprivate func startPlayback(at start: Double) {
         guard NowPlayingOwner.isVideo else { return }
         if CastManager.shared.isConnected {
             let t = player.currentTime().seconds
-            castCurrent(at: t.isFinite ? t : 0, autoplay: true)
+            castCurrent(at: max(start, t.isFinite ? t : 0), autoplay: true)
         } else {
             player.play()
         }
@@ -704,6 +772,7 @@ extension VideoPlayerModel {
                                     hlsSegmentFormat: isLive ? .TS : .AAC, hlsVideoSegmentFormat: .MPEG2_TS)
                 CastManager.shared.loadVideo(item, position: start, autoplay: play, rate: player.defaultRate)
                 castPosition = start
+                trackingId = video.id
                 isPlaying = play
                 isLoading = false
                 updateNowPlaying()
@@ -730,6 +799,7 @@ extension VideoPlayerModel {
             }
         }
         if status.state != .idle, status.position.isFinite { castPosition = status.position }
+        if status.state == .paused { saveProgress() }
         updateNowPlaying()
     }
 
@@ -737,6 +807,7 @@ extension VideoPlayerModel {
         guard isCasting, id == current?.id, isPlaying else { return }
         castPosition = position
         skipSponsorSegment(at: position)
+        saveProgressPeriodically()
     }
 
     func castLoadFailed(id: String) {
@@ -749,6 +820,7 @@ extension VideoPlayerModel {
     func castEnded(id: String, at position: Double, wasPlaying: Bool) {
         guard id == current?.id else { return }
         castPosition = 0
+        if position > 0, trackingId == id { library.savePosition(id, position, duration: duration) }
         if position > 0 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
         if wasPlaying, NowPlayingOwner.isVideo { player.play() } else { isPlaying = false }
         updateNowPlaying()

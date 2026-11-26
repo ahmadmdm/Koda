@@ -19,6 +19,10 @@ nonisolated struct YouTubeAccount: Codable, Hashable, Identifiable, Sendable {
 nonisolated final class AccountSession: @unchecked Sendable {
     static let shared = AccountSession()
 
+    /// Signs the requests made inside `withValue` as this account instead of the active one (to
+    /// read each account's subscriptions).
+    @TaskLocal static var signingAccount: UUID?
+
     private let lock = NSLock()
     private var accounts: [YouTubeAccount] = []
     private var activeId: UUID?
@@ -184,7 +188,8 @@ nonisolated final class AccountSession: @unchecked Sendable {
     /// Adds the account's headers to a request for `origin`. Returns the account it signed for,
     /// so a response can be applied to that account and not to whichever is active by then.
     func authenticate(_ request: inout URLRequest, origin: String) -> YouTubeAccount? {
-        guard let account = active, let auth = Self.authorization(account.cookies, origin: origin) else { return nil }
+        let chosen = Self.signingAccount.flatMap { id in lock.withLock { accounts.first { $0.id == id } } } ?? active
+        guard let account = chosen, let auth = Self.authorization(account.cookies, origin: origin) else { return nil }
         request.setValue(account.cookies, forHTTPHeaderField: "Cookie")
         request.setValue(auth, forHTTPHeaderField: "Authorization")
         request.setValue("0", forHTTPHeaderField: "X-Goog-AuthUser")

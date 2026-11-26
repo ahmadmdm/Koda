@@ -98,10 +98,25 @@ nonisolated enum AccountAPI {
         return videos(in: root)
     }
 
-    /// Channels the account is subscribed to (`FEchannels`).
-    @concurrent static func subscribedChannels() async throws -> [ChannelSummary] {
-        let root = try await api.web("browse", ["browseId": "FEchannels"])
-        return root.findAll("channelRenderer").compactMap(VideoAPI.parseChannelRenderer)
+    /// Channels the account is subscribed to (`FEchannels`), every page. `complete` is false when a
+    /// later page failed, so the list may be missing some.
+    @concurrent static func subscribedChannels() async throws -> (channels: [ChannelSummary], complete: Bool) {
+        var root = try await api.web("browse", ["browseId": "FEchannels"])
+        var channels: [ChannelSummary] = []
+        var seen = Set<String>()
+        for _ in 0..<30 {
+            channels += root.findAll("channelRenderer").compactMap(VideoAPI.parseChannelRenderer).filter { seen.insert($0.id).inserted }
+            guard let token = nextPageToken(root) else { return (channels, true) }
+            guard let next = try? await api.web("browse", ["continuation": token]) else { return (channels, false) }
+            root = next
+        }
+        return (channels, false)
+    }
+
+    /// The token of a list's next page (its `continuationItemRenderer`).
+    static func nextPageToken(_ root: J) -> String? {
+        root.findAll("continuationItemRenderer").lazy
+            .compactMap { $0.findAll("continuationCommand").first?["token"].string }.first
     }
 
     private static func videos(in root: J) -> [Video] {

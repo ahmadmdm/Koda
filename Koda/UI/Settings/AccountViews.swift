@@ -23,12 +23,14 @@ final class AccountModel {
                 try? await Task.sleep(for: .seconds(3))
                 await AccountAPI.refreshProfile()
                 await importSubscriptions()
+                await importOtherAccountsOnce()
             }
         }
     }
 
     func reload() {
         let previous = active?.id
+        let previousIds = Set(accounts.map(\.id))
         // Google rotates session cookies on many responses, and each rotation posts a change. No view
         // shows cookies: assign only when something else differs, so the screens reading the account
         // (Home among them) don't redraw after every signed-in request.
@@ -36,18 +38,36 @@ final class AccountModel {
         func shown(_ a: YouTubeAccount?) -> YouTubeAccount? { a.map { var a = $0; a.cookies = ""; return a } }
         if all.map(shown) != accounts.map(shown) { accounts = all }
         if shown(current) != shown(active) { active = current }
+        // Signed out of an account (or signed in again, which replaces its row): its channels go.
+        let removed = previousIds.subtracting(all.map(\.id))
+        if !removed.isEmpty { LibraryStore.shared.forgetSubscriptions(of: removed) }
         if let id = active?.id, id != previous { Task { await importSubscriptions() } }
     }
 
-    /// Adds the account's channels to the device's follows, so subscribe buttons show the account's
-    /// state. Nothing is removed: device-only follows never needed an account.
-    private func importSubscriptions() async {
-        guard let channels = try? await AccountAPI.subscribedChannels(), !channels.isEmpty else { return }
-        let library = LibraryStore.shared
-        let known = Set(library.data.subscriptions.map(\.id))
-        let added = channels.filter { !known.contains($0.id) }
-        // Usually nothing is new: leave the library (and its save and redraw) alone then.
-        if !added.isEmpty { library.data.subscriptions += added }
+    /// Tags the followed channels with the account they come from, so Subscriptions shows the
+    /// device's follows and the active account's channels only. Channels the account no longer
+    /// subscribes to lose the tag; device-only follows never needed an account and stay.
+    private func importSubscriptions(as id: UUID? = nil) async {
+        guard let id = id ?? AccountSession.shared.active?.id else { return }
+        let result = await AccountSession.$signingAccount.withValue(id) {
+            try? await AccountAPI.subscribedChannels()
+        }
+        // An empty answer is more likely a session YouTube no longer accepts than no channels.
+        guard let result, !result.channels.isEmpty, AccountSession.shared.all.contains(where: { $0.id == id }) else { return }
+        LibraryStore.shared.importSubscriptions(result.channels, account: id, complete: result.complete)
+        var done = Set(UserDefaults.standard.stringArray(forKey: Self.importedKey) ?? [])
+        if done.insert(id.uuidString).inserted { UserDefaults.standard.set(Array(done), forKey: Self.importedKey) }
+    }
+
+    private static let importedKey = "subscriptionAccountsImported"
+
+    /// Libraries from before channels were tagged mix every account's channels: read each other
+    /// account's list once, so they stop showing under the active one.
+    private func importOtherAccountsOnce() async {
+        let done = Set(UserDefaults.standard.stringArray(forKey: Self.importedKey) ?? [])
+        for account in accounts where account.id != active?.id && !account.expired && !done.contains(account.id.uuidString) {
+            await importSubscriptions(as: account.id)
+        }
     }
 
     var isSignedIn: Bool { active != nil }

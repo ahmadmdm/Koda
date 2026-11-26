@@ -34,6 +34,8 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>A! looks for Chromecast and other Google Cast devices on your Wi-Fi, so you can play music and videos on them.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>A! saves the videos you download to Photos when you ask it to.</string>
 	<key>NSSiriUsageDescription</key>
 	<string>Siri can play songs, artists, albums and playlists in A!, also in the car.</string>
 	<key>NSSupportsLiveActivities</key>

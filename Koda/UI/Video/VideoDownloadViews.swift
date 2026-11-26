@@ -69,11 +69,19 @@ struct VideoDownloadButton: View {
     private var downloads: VideoDownloadManager { .shared }
 
     var body: some View {
-        Button {
-            if downloads.isDownloaded(video.id) { confirmDelete = true }
-            else if downloads.isInProgress(video.id) { confirmCancel = true }
-            else { choosing = true }
-        } label: { label }
+        Group {
+            if let item = downloads.items.first(where: { $0.id == video.id }) {
+                Menu {
+                    VideoExportButtons(item: item)
+                    Divider()
+                    Button("Remove Download", systemImage: "trash", role: .destructive) { confirmDelete = true }
+                } label: { label }
+            } else {
+                Button {
+                    if downloads.isInProgress(video.id) { confirmCancel = true } else { choosing = true }
+                } label: { label }
+            }
+        }
         .sheet(isPresented: $choosing) { VideoDownloadSheet(video: video) }
         .confirmationDialog("Cancel this download?", isPresented: $confirmCancel, titleVisibility: .visible) {
             Button("Cancel Download", role: .destructive) { downloads.cancel(video.id) }
@@ -107,6 +115,21 @@ struct VideoDownloadButton: View {
             case nil:
                 Label("Download", systemImage: "arrow.down.circle")
             }
+        }
+    }
+}
+
+/// Save to Files and, for a video with picture, Save to Photos.
+struct VideoExportButtons: View {
+    var item: DownloadedVideo
+    private var exporter: MediaExporter { .shared }
+
+    var body: some View {
+        Button("Save to Files…", systemImage: "folder") { exporter.save(item, to: .files) }
+            .disabled(exporter.isBusy)
+        if !item.isAudioOnly {
+            Button("Save to Photos", systemImage: "photo.on.rectangle") { exporter.save(item, to: .photos) }
+                .disabled(exporter.isBusy)
         }
     }
 }
@@ -148,8 +171,16 @@ struct VideoDownloadsView: View {
                 ForEach(downloads.items) { item in
                     VideoCard(video: item.video, compact: true, queue: videos,
                               caption: "\(item.isAudioOnly ? String(localized: "Audio only") : item.quality) • \(ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file))")
+                        .swipeActions(edge: .trailing) {
+                            Button("Remove Download", systemImage: "trash", role: .destructive) { downloads.delete(item.id) }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button("Save to Files…", systemImage: "folder") { MediaExporter.shared.save(item, to: .files) }.tint(.blue)
+                            if !item.isAudioOnly {
+                                Button("Save to Photos", systemImage: "photo.on.rectangle") { MediaExporter.shared.save(item, to: .photos) }.tint(.orange)
+                            }
+                        }
                 }
-                .onDelete { idx in idx.map { downloads.items[$0].id }.forEach(downloads.delete) }
             } footer: {
                 if !downloads.items.isEmpty {
                     Text("\(downloads.items.count) videos • \(ByteCountFormatter.string(fromByteCount: downloads.totalBytes, countStyle: .file)) on this iPhone")

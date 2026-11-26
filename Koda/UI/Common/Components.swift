@@ -219,6 +219,10 @@ struct SongMenuItems: View {
                 library.toggleLike(song)
             }
             Button("Add to Playlist…", systemImage: "text.badge.plus") { app.addToPlaylist = [song] }
+            if downloads.isDownloaded(song.id) || song.isLocal {
+                Button("Save to Files…", systemImage: "folder") { MediaExporter.shared.saveToFiles(song) }
+                    .disabled(MediaExporter.shared.isBusy)
+            }
             if downloads.isDownloaded(song.id) {
                 Button("Remove Download", systemImage: "trash", role: .destructive) { downloads.delete(song.id) }
             } else if !song.isLocal {
