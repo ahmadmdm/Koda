@@ -74,6 +74,8 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: $video.isPresented) {
             WatchView()
+                // Clear behind the page, so pulling it down shows the app underneath.
+                .presentationBackground(.clear)
         }
         .fullScreenCover(item: $app.shorts) { ShortsPagerView(launch: $0) }
         // The full-screen player presents its own copy; this one only shows when nothing covers the root.

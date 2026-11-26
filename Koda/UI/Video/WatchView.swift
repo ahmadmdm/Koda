@@ -3,6 +3,12 @@ import AVKit
 
 struct SystemVideoPlayer: UIViewControllerRepresentable {
     var player: AVPlayer
+    /// A one-finger, mostly vertical pan down the inline video: its downward distance while it moves,
+    /// then its distance and speed when it ends (or cancels, as 0). AVKit's own gestures (tap for the
+    /// controls, scrubbing, pinch) run alongside it, and it never starts in fullscreen.
+    var onPullDown: ((CGFloat) -> Void)? = nil
+    var onPullDownEnded: ((_ distance: CGFloat, _ velocity: CGFloat) -> Void)? = nil
+
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let vc = AVPlayerViewController()
         vc.player = player
@@ -30,9 +36,18 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
             ])
             context.coordinator.host = host
         }
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
+        pan.maximumNumberOfTouches = 1
+        pan.cancelsTouchesInView = false
+        pan.delegate = context.coordinator
+        vc.view.addGestureRecognizer(pan)
+        context.coordinator.onPullDown = onPullDown
+        context.coordinator.onPullDownEnded = onPullDownEnded
         return vc
     }
     func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
+        context.coordinator.onPullDown = onPullDown
+        context.coordinator.onPullDownEnded = onPullDownEnded
         if vc.player !== player { vc.player = player }
         let pip = UserDefaults.standard.object(forKey: "pictureInPicture") as? Bool ?? true
         if vc.allowsPictureInPicturePlayback != pip {
@@ -42,8 +57,45 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
-    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate, UIGestureRecognizerDelegate {
         var host: UIViewController?
+        var onPullDown: ((CGFloat) -> Void)?
+        var onPullDownEnded: ((CGFloat, CGFloat) -> Void)?
+        private var isFullScreen = false
+
+        @objc func pan(_ pan: UIPanGestureRecognizer) {
+            // Window coordinates: the video itself moves with the finger.
+            let space = pan.view?.window
+            let distance = max(0, pan.translation(in: space).y)
+            switch pan.state {
+            case .changed: onPullDown?(distance)
+            case .ended: onPullDownEnded?(distance, pan.velocity(in: space).y)
+            case .cancelled, .failed: onPullDownEnded?(0, 0)
+            default: break
+            }
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer, onPullDown != nil, !isFullScreen,
+                  !VideoPlayerModel.shared.isPictureInPictureActive else { return false }
+            let v = pan.velocity(in: pan.view)
+            // Down, and clearly more down than sideways, so scrubbing and horizontal swipes stay AVKit's.
+            return v.y > 0 && v.y > abs(v.x) * 1.5
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            true
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  willBeginFullScreenPresentationWithAnimationCoordinator coordinator: any UIViewControllerTransitionCoordinator) {
+            isFullScreen = true
+        }
+
+        func playerViewController(_ playerViewController: AVPlayerViewController,
+                                  willEndFullScreenPresentationWithAnimationCoordinator coordinator: any UIViewControllerTransitionCoordinator) {
+            coordinator.animate(alongsideTransition: nil) { [weak self] _ in self?.isFullScreen = false }
+        }
 
         func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
             VideoPlayerModel.shared.isPictureInPictureActive = true
@@ -145,6 +197,8 @@ struct WatchView: View {
     @State private var showChat = false
     @State private var sidePanel = SidePanel.related
     @State private var width: CGFloat = 0
+    /// How far the page is pulled down by a drag on the video or the top bar (see `pullEnded`).
+    @State private var pull: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     enum SidePanel: Hashable { case related, comments }
@@ -191,6 +245,12 @@ struct WatchView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(Color(.systemBackground))
+        // Follows the finger, shrinking and fading a little, like a sheet pulled down.
+        .clipShape(RoundedRectangle(cornerRadius: pull > 0 ? 36 : 0, style: .continuous))
+        .scaleEffect(1 - min(pull / 1500, 0.1), anchor: .top)
+        .offset(y: pull)
+        .opacity(1 - min(pull / 1000, 0.3))
+        .onAppear { pull = 0 }
         .sheet(isPresented: $showComments) {
             if let token = model.details?.commentsToken { CommentsView(token: token, count: model.details?.commentCount) }
         }
@@ -252,12 +312,35 @@ struct WatchView: View {
                 .accessibilityLabel("Close")
         }
         .padding(.horizontal, sizeClass == .regular ? 16 : 10).padding(.bottom, 8)
+        .contentShape(Rectangle())
+        // Pulling the bar down minimizes too; taps still reach its buttons.
+        .gesture(DragGesture(minimumDistance: 12, coordinateSpace: .global)
+            .onChanged { v in
+                guard pull > 0 || (v.translation.height > 0 && v.translation.height > abs(v.translation.width) * 1.5) else { return }
+                pull = max(0, v.translation.height)
+            }
+            .onEnded { v in
+                guard pull > 0 else { return }
+                pullEnded(max(0, v.translation.height), velocity: v.velocity.height)
+            })
+    }
+
+    /// Past a third of the way, or flicked down, the page minimizes to the mini player (as the chevron
+    /// does; playback carries on). Otherwise it springs back.
+    private func pullEnded(_ distance: CGFloat, velocity: CGFloat) {
+        if distance > 140 || (distance > 40 && velocity > 900) {
+            model.isPresented = false
+        } else {
+            withAnimation(.spring(duration: 0.35, bounce: 0.2)) { pull = 0 }
+        }
     }
 
     private var videoSurface: some View {
         ZStack {
             Color.black
-            SystemVideoPlayer(player: model.player)
+            SystemVideoPlayer(player: model.player,
+                              onPullDown: { pull = $0 },
+                              onPullDownEnded: { pullEnded($0, velocity: $1) })
                 .pictureFilter()
             if model.isCasting { CastingVideoOverlay() }
             if model.isLoading { ProgressView().tint(.white).controlSize(.large) }

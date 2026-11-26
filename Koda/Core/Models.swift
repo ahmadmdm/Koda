@@ -172,6 +172,63 @@ nonisolated struct ChannelPage: Sendable {
     var subscribers: String?
     var description: String?
     var videos: [Video]
+    var videoCount: String? = nil
+    var isVerified = false
+    /// The channel's tabs as the response lists them, with their own browse params.
+    var tabs: [ChannelTab] = []
+    /// Continuation that loads the About panel (`aboutChannelViewModel`).
+    var aboutToken: String? = nil
+
+    /// The tabs the channel page offers as sections, in YouTube's order.
+    var contentTabs: [ChannelTab] { tabs.filter { [.videos, .live, .playlists, .podcasts].contains($0.kind) } }
+    /// The tab a channel opens on: Videos, else its first other content tab.
+    var defaultTab: ChannelTab? { tabs.first { $0.kind == .videos } ?? contentTabs.first }
+    var hasShorts: Bool { tabs.isEmpty || tabs.contains { $0.kind == .shorts } }
+}
+
+/// One tab of a channel page. `kind` comes from the tab's URL (`/videos`, `/playlists`, ...), since
+/// its title is in the content language; `params` is the tab's own browse params from the response.
+nonisolated struct ChannelTab: Hashable, Identifiable, Sendable {
+    enum Kind: String, Sendable { case home, videos, shorts, live, playlists, podcasts, other }
+    var kind: Kind
+    var title: String
+    var params: String
+    var id: String { params }
+}
+
+/// The items of one channel tab and the token of its next page.
+nonisolated struct ChannelTabPage: Sendable {
+    var videos: [Video] = []
+    var playlists: [VideoPlaylistSummary] = []
+    var continuation: String?
+}
+
+nonisolated struct ChannelLink: Hashable, Identifiable, Sendable {
+    var title: String
+    var display: String
+    var url: URL
+    var id: String { url.absoluteString + title }
+}
+
+/// A channel's About panel.
+nonisolated struct ChannelAbout: Sendable {
+    var description: String?
+    var links: [ChannelLink] = []
+    var joined: String?
+    var views: String?
+    var country: String?
+    var subscribers: String?
+    var videos: String?
+    var url: String?
+}
+
+/// A titled row of videos or playlists on an explore page (a topic channel or the Hype leaderboard).
+nonisolated struct VideoShelf: Identifiable, Hashable, Sendable {
+    var id: String
+    var title: String?
+    var videos: [Video] = []
+    var playlists: [VideoPlaylistSummary] = []
+    var isEmpty: Bool { videos.isEmpty && playlists.isEmpty }
 }
 
 nonisolated struct StreamInfo: Sendable {

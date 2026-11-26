@@ -6507,6 +6507,76 @@
           }
         }
       }
+    },
+    "Nothing here right now": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا يوجد شيء هنا الآن"
+          }
+        }
+      }
+    },
+    "Pull to refresh or choose another topic.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "اسحب للأسفل للتحديث أو اختر موضوعًا آخر."
+          }
+        }
+      }
+    },
+    "Fashion & Beauty": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الموضة والجمال"
+          }
+        }
+      }
+    },
+    "Verified": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "موثّقة"
+          }
+        }
+      }
+    },
+    "Links": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "الروابط"
+          }
+        }
+      }
+    },
+    "More info": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "مزيد من المعلومات"
+          }
+        }
+      }
+    },
+    "No playlists": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "لا توجد قوائم تشغيل"
+          }
+        }
+      }
     }
   }
 }

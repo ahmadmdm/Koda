@@ -118,12 +118,16 @@ struct VideoHomeView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(AccountModel.self) private var account
     @State private var topic = VideoTopic.all[0]
-    @State private var videos: [Video] = []
-    @State private var loadStamp: LoadStamp?
-    @State private var loading = false
-    @State private var error: String?
+    /// Each topic's shelves, so going back to a chip shows what it had at once.
+    @State private var feeds: [String: [VideoShelf]] = [:]
+    @State private var stamps: [String: LoadStamp] = [:]
+    @State private var errors: [String: String] = [:]
+    @State private var loadingKey: String?
+
+    private var key: String { "\(topic.id)|\(account.active?.id.uuidString ?? "")" }
 
     var body: some View {
+        let key = key
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -138,7 +142,7 @@ struct VideoHomeView: View {
                     }
                 }
                 let continueWatching = WatchProgress.continueWatching(library.data.videoHistory.filter { !library.isHidden($0.video) })
-                if topic == VideoTopic.all[0], !continueWatching.isEmpty {
+                if topic.source == .forYou, !continueWatching.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Continue watching").font(.title3.bold()).padding(.horizontal)
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -148,37 +152,108 @@ struct VideoHomeView: View {
                         }
                     }
                 }
-                ShortsShelf(source: .search(topic.query.isEmpty ? "trending shorts" : topic.query + " shorts"))
-                if loading && videos.isEmpty { LoadingView() }
-                if let error, videos.isEmpty { ErrorView(message: error) { Task { await load() } } }
-                let visible = library.filtered(videos)
-                VideoGrid(videos: visible)
+                ShortsShelf(source: .search(topic.shortsQuery(language: InnerTube.shared.language)))
+                feed(key: key)
             }
             .padding(.bottom, 24)
         }
         .navigationTitle("Home")
         .toolbarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
-        .refreshable { await load() }
-        .task(id: "\(topic.id)|\(account.active?.id.uuidString ?? "")") {
-            // Back on Home after a channel or playlist: keep the feed (up to four requests) while it is fresh.
-            let key = "\(topic.id)|\(account.active?.id.uuidString ?? "")"
-            guard loadStamp?.isFresh(for: key) != true else { return }
-            await load()
-            if !Task.isCancelled, error == nil { loadStamp = LoadStamp(key: key) }
+        .refreshable { await load(force: true) }
+        .task(id: key) {
+            // Back on Home after a channel or playlist: keep the feed while it is fresh.
+            await load(force: false)
         }
     }
 
-    private func load() async {
-        loading = true; defer { loading = false }
-        do {
-            if topic == VideoTopic.all[0], AccountAPI.isSignedIn, let home = try? await AccountAPI.videoHome(), !home.isEmpty {
-                videos = home
+    @ViewBuilder private func feed(key: String) -> some View {
+        let shelves = (feeds[key] ?? []).map { s in var s = s; s.videos = library.filtered(s.videos); return s }.filter { !$0.isEmpty }
+        if shelves.isEmpty {
+            if loadingKey == key || (feeds[key] == nil && errors[key] == nil) {
+                LoadingView()
+            } else if let error = errors[key] {
+                ErrorView(message: error) { Task { await load(force: true) } }
             } else {
-                videos = try await VideoAPI.feed(topic: topic, seeds: library.data.videoHistory.prefix(3).map(\.video.id))
+                ContentUnavailableView("Nothing here right now", systemImage: topic.icon,
+                                       description: Text("Pull to refresh or choose another topic."))
             }
-            error = nil
-        } catch { self.error = error.localizedDescription }
+        } else if shelves.count == 1, shelves[0].playlists.isEmpty {
+            VideoGrid(videos: shelves[0].videos)
+        } else {
+            ForEach(shelves) { shelf in VideoShelfRow(shelf: shelf) }
+        }
+    }
+
+    private func load(force: Bool) async {
+        let key = key, topic = topic
+        if !force, feeds[key] != nil, stamps[key]?.isFresh(for: key) == true { return }
+        loadingKey = key
+        defer { if loadingKey == key { loadingKey = nil } }
+        do {
+            let shelves: [VideoShelf]
+            if topic.source == .forYou, AccountAPI.isSignedIn, let home = try? await AccountAPI.videoHome(), !home.isEmpty {
+                shelves = [VideoShelf(id: "home", title: nil, videos: home)]
+            } else {
+                shelves = try await VideoAPI.feed(topic: topic, seeds: library.data.videoHistory.prefix(3).map(\.video.id))
+            }
+            feeds[key] = shelves
+            stamps[key] = LoadStamp(key: key)
+            errors[key] = nil
+        } catch {
+            // Switching chips cancels the request of the one left; that is not an error to show.
+            if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled { return }
+            errors[key] = error.localizedDescription
+        }
+    }
+}
+
+/// A titled, horizontally scrolling row of videos and playlists.
+struct VideoShelfRow: View {
+    var shelf: VideoShelf
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title = shelf.title, !title.isEmpty {
+                Text(title).font(.title3.bold()).lineLimit(1).padding(.horizontal)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 14) {
+                    ForEach(shelf.videos) { VideoCard(video: $0, queue: shelf.videos).frame(width: 260) }
+                    ForEach(shelf.playlists) { VideoPlaylistCard(playlist: $0).frame(width: 220) }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+}
+
+/// A playlist (or podcast, or YouTube Music station) that opens the playlist page.
+struct VideoPlaylistCard: View {
+    var playlist: VideoPlaylistSummary
+    var showsChannel = true
+
+    var body: some View {
+        NavigationLink(value: Route.videoPlaylist(playlist.id, playlist.title)) {
+            VStack(alignment: .leading, spacing: 8) {
+                Color.clear
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .overlay { Artwork(url: playlist.thumbnail.flatMap(URL.init(string:)), cornerRadius: 0, placeholderIcon: "list.bullet.rectangle") }
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(alignment: .bottomTrailing) {
+                        if let c = playlist.count {
+                            Label(c, systemImage: "list.bullet").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 5)).foregroundStyle(.white).padding(6)
+                        }
+                    }
+                Text(playlist.title).font(.subheadline.weight(.medium)).lineLimit(2).multilineTextAlignment(.leading)
+                if showsChannel, !playlist.channel.isEmpty {
+                    Text(playlist.channel).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -329,8 +404,12 @@ struct ChannelView: View {
     @Environment(LibraryStore.self) private var library
     @State private var page: ChannelPage?
     @State private var error: String?
+    @State private var tab: ChannelTab?
+    @State private var tabPages: [String: ChannelTabPage] = [:]
+    @State private var tabErrors: [String: String] = [:]
     @State private var filter = ""
     @State private var sortNewest = true
+    @State private var showAbout = false
 
     var body: some View {
         Group {
@@ -340,46 +419,206 @@ struct ChannelView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task { if page == nil { await load() } }
+        .sheet(isPresented: $showAbout) { if let page { ChannelAboutSheet(page: page) } }
     }
 
     private func load() async {
-        do { page = try await VideoAPI.channel(channelId); error = nil } catch { self.error = error.localizedDescription }
+        do {
+            let (p, t, c) = try await VideoAPI.channel(channelId)
+            if let t { tabPages[t.id] = c }
+            tab = t
+            page = p
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func loadTab(_ tab: ChannelTab, page: ChannelPage) async {
+        do {
+            tabPages[tab.id] = try await VideoAPI.channelTab(page.id, tab: tab, name: page.name)
+            tabErrors[tab.id] = nil
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
+            tabErrors[tab.id] = error.localizedDescription
+        }
+    }
+
+    private func loadMore(_ tab: ChannelTab, page: ChannelPage) async {
+        guard let current = tabPages[tab.id], let token = current.continuation else { return }
+        guard let more = try? await VideoAPI.channelTab(page.id, tab: tab, name: page.name, continuation: token) else {
+            tabPages[tab.id]?.continuation = nil; return
+        }
+        let videoIds = Set(current.videos.map(\.id)), playlistIds = Set(current.playlists.map(\.id))
+        let videos = more.videos.filter { !videoIds.contains($0.id) }, playlists = more.playlists.filter { !playlistIds.contains($0.id) }
+        tabPages[tab.id]?.videos += videos
+        tabPages[tab.id]?.playlists += playlists
+        // A page that adds nothing new would only bring the same spinner back.
+        tabPages[tab.id]?.continuation = videos.isEmpty && playlists.isEmpty ? nil : more.continuation
     }
 
     private func content(_ page: ChannelPage) -> some View {
         let summary = ChannelSummary(id: page.id, name: page.name, avatar: page.avatar, subscribers: page.subscribers)
-        let videos = page.videos.filter { filter.isEmpty || $0.title.localizedCaseInsensitiveContains(filter) }
-        let ordered = sortNewest ? videos : videos.reversed()
         return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: 16) {
                 if let banner = page.banner {
                     Artwork(url: URL(string: banner), cornerRadius: 16).frame(height: 110).clipped().padding(.horizontal)
                 }
                 HStack(spacing: 14) {
                     Artwork(url: page.avatar.flatMap(URL.init(string:)), cornerRadius: 40, placeholderIcon: "person.fill").frame(width: 80, height: 80)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(page.name).font(.title2.bold())
-                        Text([page.handle, page.subscribers].compactMap { $0 }.joined(separator: " • ")).font(.subheadline).foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Text(page.name).font(.title2.bold()).lineLimit(2)
+                            if page.isVerified {
+                                Image(systemName: "checkmark.seal.fill").foregroundStyle(.secondary).accessibilityLabel("Verified")
+                            }
+                        }
+                        if let handle = page.handle { Text(handle).font(.subheadline).foregroundStyle(.secondary) }
+                        let counts = [page.subscribers, page.videoCount].compactMap { $0 }
+                        if !counts.isEmpty { Text(counts.joined(separator: " • ")).font(.subheadline).foregroundStyle(.secondary) }
                     }
                 }
                 .padding(.horizontal)
-                if let d = page.description, !d.isEmpty { Text(d).font(.footnote).foregroundStyle(.secondary).lineLimit(3).padding(.horizontal) }
+                Button { showAbout = true } label: {
+                    HStack(alignment: .firstTextBaseline) {
+                        if let d = page.description, !d.isEmpty {
+                            Text(d).font(.footnote).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.leading)
+                        } else {
+                            Text("About").font(.footnote.weight(.semibold))
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal)
+                .accessibilityLabel("About")
                 Button { library.toggleSubscription(summary) } label: {
                     Label(library.isSubscribed(page.id) ? "Subscribed" : "Subscribe", systemImage: library.isSubscribed(page.id) ? "bell.fill" : "bell")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(library.isSubscribed(page.id) ? AnyPrimitiveButtonStyle(.glass) : AnyPrimitiveButtonStyle(.glassProminent))
                 .controlSize(.large).padding(.horizontal)
-                ShortsShelf(source: .channel(page.id))
-                HStack {
-                    TextField("Search uploads", text: $filter).textFieldStyle(.roundedBorder)
-                    Button { sortNewest.toggle() } label: { Label(sortNewest ? "Newest" : "Oldest", systemImage: "arrow.up.arrow.down") }.buttonStyle(.glass)
+                if page.hasShorts { ShortsShelf(source: .channel(page.id)) }
+                if page.contentTabs.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        GlassEffectContainer(spacing: 8) {
+                            HStack(spacing: 8) {
+                                ForEach(page.contentTabs) { t in
+                                    Button { tab = t } label: { Text(t.title).font(.subheadline.weight(.medium)) }
+                                        .filterChip(selected: tab == t)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
-                .padding(.horizontal)
-                VideoGrid(videos: Array(ordered), spacing: 20)
+                if let tab { tabContent(tab, page: page) }
+                else { tabItems(ChannelTabPage(videos: page.videos), tab: nil, page: page) }
             }
             .padding(.vertical)
         }
+        .task(id: tab?.id) {
+            if let tab, tabPages[tab.id] == nil { await loadTab(tab, page: page) }
+        }
+    }
+
+    @ViewBuilder private func tabContent(_ tab: ChannelTab, page: ChannelPage) -> some View {
+        if let items = tabPages[tab.id] {
+            tabItems(items, tab: tab, page: page)
+        } else if let message = tabErrors[tab.id] {
+            ErrorView(message: message) { Task { await loadTab(tab, page: page) } }
+        } else {
+            LoadingView()
+        }
+    }
+
+    @ViewBuilder private func tabItems(_ items: ChannelTabPage, tab: ChannelTab?, page: ChannelPage) -> some View {
+        if tab?.kind == .playlists || tab?.kind == .podcasts {
+            if items.playlists.isEmpty {
+                ContentUnavailableView("No playlists", systemImage: "list.bullet.rectangle")
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 14, alignment: .top)], alignment: .leading, spacing: 18) {
+                    ForEach(items.playlists) { VideoPlaylistCard(playlist: $0, showsChannel: false) }
+                }
+                .padding(.horizontal)
+            }
+        } else {
+            let videos = items.videos.filter { filter.isEmpty || $0.title.localizedCaseInsensitiveContains(filter) }
+            HStack {
+                TextField("Search uploads", text: $filter).textFieldStyle(.roundedBorder)
+                Button { sortNewest.toggle() } label: { Label(sortNewest ? "Newest" : "Oldest", systemImage: "arrow.up.arrow.down") }.buttonStyle(.glass)
+            }
+            .padding(.horizontal)
+            if items.videos.isEmpty {
+                ContentUnavailableView("No videos", systemImage: "play.rectangle")
+            } else {
+                VideoGrid(videos: sortNewest ? videos : videos.reversed(), spacing: 20)
+            }
+        }
+        if let tab, let token = items.continuation {
+            ProgressView().frame(maxWidth: .infinity).task(id: token) { await loadMore(tab, page: page) }
+        }
+    }
+}
+
+/// A channel's About panel: description, links and the details YouTube lists.
+struct ChannelAboutSheet: View {
+    var page: ChannelPage
+    @Environment(\.dismiss) private var dismiss
+    @State private var about: ChannelAbout?
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                let description = about?.description ?? page.description
+                if let description, !description.isEmpty {
+                    Section("Description") { LinkedText(text: description) { _ in } }
+                }
+                if let links = about?.links, !links.isEmpty {
+                    Section("Links") {
+                        ForEach(links) { link in
+                            Link(destination: link.url) {
+                                Label {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(link.title).foregroundStyle(.primary)
+                                        Text(link.display).font(.caption).foregroundStyle(.tint)
+                                    }
+                                } icon: { Image(systemName: "link") }
+                            }
+                        }
+                    }
+                }
+                Section("More info") {
+                    if let url = about?.url ?? page.handle { row(url, "globe") }
+                    if let s = about?.subscribers ?? page.subscribers { row(s, "person.2") }
+                    if let v = about?.videos ?? page.videoCount { row(v, "play.rectangle") }
+                    if let v = about?.views { row(v, "chart.line.uptrend.xyaxis") }
+                    if let j = about?.joined { row(j, "info.circle") }
+                    if let c = about?.country { row(c, "mappin.and.ellipse") }
+                    if about == nil, page.aboutToken != nil, error == nil {
+                        ProgressView().frame(maxWidth: .infinity)
+                    }
+                    if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
+                }
+            }
+            .navigationTitle(page.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .close) { dismiss() }
+                }
+            }
+            .task {
+                guard about == nil, let token = page.aboutToken else { return }
+                do { about = try await VideoAPI.channelAbout(token: token) } catch { self.error = error.localizedDescription }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func row(_ text: String, _ icon: String) -> some View {
+        Label(text, systemImage: icon).textSelection(.enabled)
     }
 }
 

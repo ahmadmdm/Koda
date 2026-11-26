@@ -48,7 +48,11 @@ struct PlayerView: View {
         .toastOverlay()
         .offset(y: dragOffset)
         .gesture(DragGesture().onChanged { v in if v.translation.height > 0 { dragOffset = v.translation.height } }
-            .onEnded { v in if v.translation.height > 140 { dismiss() }; withAnimation(.spring) { dragOffset = 0 } })
+            .onEnded { v in
+                // Far enough, or flicked down.
+                if v.translation.height > 140 || (v.translation.height > 40 && v.velocity.height > 900) { dismiss() }
+                withAnimation(.spring) { dragOffset = 0 }
+            })
         .animation(.smooth(duration: 0.35), value: showLyrics)
         .animation(.smooth(duration: 0.35), value: styleRaw)
         // While the queue sheet is up it presents the playlist sheet itself.

@@ -3,7 +3,7 @@ import Foundation
 
 /// Saved InnerTube and suggestion responses in `Fixtures/`, captured once with curl
 /// (signed out, hl=en, gl=US) and scrubbed of tracking ids, visitor data and client IPs,
-/// so the parser tests run offline.
+/// so the parser tests run offline. Files ending in `_ar` were captured with hl=ar, gl=SA.
 enum Fixture {
     private final class Token {}
 
