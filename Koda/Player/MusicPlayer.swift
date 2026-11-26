@@ -109,7 +109,8 @@ final class MusicPlayer {
             let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
             let options = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt).map(AVAudioSession.InterruptionOptions.init)
             MainActor.assumeIsolated {
-                // A call on the iPhone doesn't stop what plays on the TV.
+                // A call on the iPhone doesn't stop what plays on the TV; the keeper loop carries on.
+                if type == .ended { CastBackgroundKeeper.resumeIfNeeded() }
                 guard let self, !self.isCasting else { return }
                 if type == .began {
                     self.wasPlayingBeforeInterruption = self.isPlaying

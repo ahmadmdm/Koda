@@ -108,6 +108,7 @@ final class CastManager: NSObject {
         media = .none
         remote?.add(self)
         startTicking()
+        CastBackgroundKeeper.start()
         AppState.current?.showToast("Casting to \(deviceName ?? "")")
         // Whatever is playing (or paused) moves to the receiver.
         if NowPlayingOwner.isVideo, VideoPlayerModel.shared.current != nil {
@@ -130,6 +131,7 @@ final class CastManager: NSObject {
         tickTask?.cancel()
         tickTask = nil
         CastProxyServer.shared.stop()
+        CastBackgroundKeeper.stop()
         proxyHost = nil
         proxyPort = nil
         if let error, !endingOnPurpose, (error as NSError).code != GCKErrorCode.cancelled.rawValue {
@@ -361,6 +363,7 @@ extension CastManager: @preconcurrency GCKSessionManagerListener {
         deviceName = session.device.friendlyName ?? String(localized: "Cast device")
         remote?.add(self)
         startTicking()
+        CastBackgroundKeeper.start()
         if let id = remote?.mediaStatus?.mediaInformation?.contentID {
             if id == MusicPlayer.shared.current?.id || MusicPlayer.shared.upNext.contains(where: { $0.id == id }) { media = .music }
             else if id == VideoPlayerModel.shared.current?.id { media = .video(id) }
