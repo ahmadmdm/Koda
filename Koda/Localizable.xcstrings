@@ -6361,6 +6361,42 @@
           }
         }
       }
+    },
+    "Picture in Picture": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "صورة داخل صورة"
+          }
+        }
+      }
+    },
+    "Close Player": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "إغلاق المشغّل"
+          }
+        }
+      }
+    },
+    "iOS already shows what's playing on the Lock Screen and in the Dynamic Island. Turn this on for Koda's own card as well; audio-only downloads also use it.": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يعرض iOS ما يُشغَّل على شاشة القفل وفي الجزيرة العائمة. فعّل هذا لإظهار بطاقة A! الخاصة أيضًا؛ وتستخدمها تنزيلات الصوت فقط."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS already shows what's playing on the Lock Screen and in the Dynamic Island. Turn this on for A!'s own card as well; audio-only downloads also use it."
+          }
+        }
+      }
     }
   }
 }

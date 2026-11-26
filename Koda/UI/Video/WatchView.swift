@@ -6,8 +6,9 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let vc = AVPlayerViewController()
         vc.player = player
-        vc.allowsPictureInPicturePlayback = true
-        vc.canStartPictureInPictureAutomaticallyFromInline = true
+        let pip = UserDefaults.standard.object(forKey: "pictureInPicture") as? Bool ?? true
+        vc.allowsPictureInPicturePlayback = pip
+        vc.canStartPictureInPictureAutomaticallyFromInline = pip
         // VideoPlayerModel publishes Now Playing itself, and only while the video owns it.
         vc.updatesNowPlayingInfoCenter = false
         vc.delegate = context.coordinator
@@ -33,6 +34,11 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
         if vc.player !== player { vc.player = player }
+        let pip = UserDefaults.standard.object(forKey: "pictureInPicture") as? Bool ?? true
+        if vc.allowsPictureInPicturePlayback != pip {
+            vc.allowsPictureInPicturePlayback = pip
+            vc.canStartPictureInPictureAutomaticallyFromInline = pip
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }

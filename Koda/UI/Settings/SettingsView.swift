@@ -9,7 +9,8 @@ struct SettingsView: View {
     @AppStorage("palette") private var palette = Palette.violet.rawValue
     @AppStorage("playerStyle") private var playerStyle = PlayerStyle.classic.rawValue
     @AppStorage("ambientBackground") private var ambient = true
-    @AppStorage(LiveActivitySync.enabledKey) private var liveActivity = true
+    @AppStorage(LiveActivitySync.enabledKey) private var liveActivity = false
+    @AppStorage("pictureInPicture") private var pictureInPicture = true
     @AppStorage("homeLayout") private var homeLayout = "mix"
     @AppStorage("musicQuality") private var musicQuality = "high"
     @AppStorage("downloadQuality") private var downloadQuality = "high"
@@ -88,7 +89,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Player")
                 } footer: {
-                    Text("The Live Activity shows what's playing, and video downloads, on the Lock Screen and in the Dynamic Island.")
+                    Text("iOS already shows what's playing on the Lock Screen and in the Dynamic Island. Turn this on for Koda's own card as well; audio-only downloads also use it.")
                 }
             }
             if matches(.playback) {
@@ -104,6 +105,7 @@ struct SettingsView: View {
                     Toggle("Autoplay next video", isOn: $videoAutoplay)
                     Toggle("SponsorBlock", isOn: $sponsorBlock)
                     Toggle("Turn on subtitles automatically", isOn: $autoSubtitles)
+                    Toggle("Picture in Picture", isOn: $pictureInPicture)
                     Picker("Default video quality", selection: Binding(get: { VideoPlayerModel.shared.quality }, set: { VideoPlayerModel.shared.quality = $0 })) {
                         ForEach(VideoQualityCap.allCases) { Text($0.title).tag($0) }
                     }
@@ -197,7 +199,7 @@ private enum SettingsGroup: CaseIterable {
         case .appearance: "appearance theme dark light color palette accent"
         case .player: "player style ambient background live activity dynamic island lock screen"
         case .playback: "playback quality normalise normalize volume preload stream download"
-        case .video: "video autoplay sponsorblock sponsor quality subtitles captions"
+        case .video: "video autoplay sponsorblock sponsor quality subtitles captions picture in picture pip"
         case .content: "content region language country"
         case .storage: "storage downloads cache history clear"
         case .backup: "backup restore export import"
@@ -214,7 +216,7 @@ private enum SettingsGroup: CaseIterable {
         case .appearance: ["Appearance", "Theme", "Colour palette", "Home layout", "Haptics"]
         case .player: ["Player", "Player style", "Ambient artwork background", "Live Activity"]
         case .playback: ["Music playback", "Streaming quality", "Download quality", "Normalise volume", "Preload upcoming songs"]
-        case .video: ["Video", "Autoplay next video", "SponsorBlock", "Turn on subtitles automatically", "Default video quality"]
+        case .video: ["Video", "Autoplay next video", "SponsorBlock", "Turn on subtitles automatically", "Picture in Picture", "Default video quality"]
         case .content: ["Content", "Region", "Content language", "Hidden & blocked"]
         case .storage: ["Storage", "Downloads", "Manage downloads", "Clear listening & watch history"]
         case .backup: ["Backup", "Back up library…", "Restore from backup…"]

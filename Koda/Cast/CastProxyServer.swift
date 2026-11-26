@@ -114,7 +114,7 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
         let encoded = Data(upstream.absoluteString.utf8).base64EncodedString()
             .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
         // An extension the receiver's player recognises, after the encoded URL.
-        let ext = resource == .playlist ? ".m3u8" : ""
+        let ext = resource == .playlist ? ".m3u8" : Self.segmentExtension(upstream)
         return URL(string: "http://\(Self.hostLiteral(host)):\(port)/\(token)/\(resource.rawValue)/\(encoded)\(ext)")!
     }
 
@@ -126,6 +126,25 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
     }
 
     private static func hostLiteral(_ host: String) -> String { host.contains(":") ? "[\(host)]" : host }
+
+    /// YouTube names every HLS segment `seg.ts`, but its audio renditions are packed AAC with an ID3
+    /// timestamp (`goap` in the path; video is `govp`). Receivers pick the parser from the extension and
+    /// MIME type, so audio is exposed as `.aac` / `audio/aac` and video as `.ts` / `video/mp2t`.
+    static func segmentExtension(_ upstream: URL) -> String {
+        let path = upstream.path
+        if path.contains("/goap/") { return ".aac" }
+        if path.hasSuffix(".ts") || path.contains("/govp/") { return ".ts" }
+        if path.hasSuffix(".mp4") || path.hasSuffix(".m4s") { return ".mp4" }
+        return ""
+    }
+
+    static func segmentContentType(_ upstream: URL, fallback: String) -> String {
+        switch segmentExtension(upstream) {
+        case ".aac": "audio/aac"
+        case ".ts": "video/mp2t"
+        default: fallback
+        }
+    }
 
     static func decodeUpstream(_ component: String) -> URL? {
         var b64 = component
@@ -227,6 +246,7 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
             return
         }
         let headOnly = request.method == "HEAD"
+        castLog.info("proxy \(request.method, privacy: .public) \(parts[1], privacy: .public) range=\(request.headers["range"] ?? "-", privacy: .public) \(Self.decodeUpstream(parts[2])?.lastPathComponent ?? parts[2], privacy: .public)")
         switch parts[1] {
         case "f":
             guard let file = files[parts[2]] else { send(connection, status: 404, headers: [:], body: nil); return }
@@ -446,7 +466,9 @@ nonisolated private final class SegmentRelay: NSObject, URLSessionDataDelegate, 
                     completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
         let http = response as? HTTPURLResponse
         let status = http?.statusCode ?? 502
-        var headers: [String: String] = ["Content-Type": http?.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"]
+        castLog.info("proxy upstream \(status) \(http?.value(forHTTPHeaderField: "Content-Type") ?? "-", privacy: .public)")
+        let upstreamType = http?.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
+        var headers: [String: String] = ["Content-Type": (dataTask.originalRequest?.url ?? response.url).map { CastProxyServer.segmentContentType($0, fallback: upstreamType) } ?? upstreamType]
         // URLSession undoes a Content-Encoding, so the upstream length only holds without one.
         if http?.value(forHTTPHeaderField: "Content-Encoding") == nil, response.expectedContentLength >= 0 {
             headers["Content-Length"] = String(response.expectedContentLength)

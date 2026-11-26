@@ -9,7 +9,7 @@ import UIKit
 @MainActor
 enum LiveActivitySync {
     static let enabledKey = "liveActivity"
-    static var isEnabled: Bool { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
+    static var isEnabled: Bool { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? false }
 
     private typealias State = NowPlayingActivityAttributes.ContentState
     private static var activity: Activity<NowPlayingActivityAttributes>?

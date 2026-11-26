@@ -54,6 +54,17 @@ struct RootView: View {
                     MiniPlayer()
                         .matchedTransitionSource(id: "player", in: playerNamespace)
                         .onTapGesture { app.showPlayer = true }
+                        // Swipe down, or touch and hold › Close Player, to stop the music and hide the bar.
+                        .gesture(DragGesture(minimumDistance: 24).onEnded { drag in
+                            if drag.translation.height > 40, abs(drag.translation.width) < drag.translation.height {
+                                withAnimation(.snappy) { player.stop() }
+                            }
+                        })
+                        .contextMenu {
+                            Button("Close Player", systemImage: "xmark.circle", role: .destructive) {
+                                withAnimation(.snappy) { player.stop() }
+                            }
+                        }
                 }
             }
         }
