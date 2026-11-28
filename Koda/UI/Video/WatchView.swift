@@ -43,6 +43,7 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
         vc.view.addGestureRecognizer(pan)
         context.coordinator.onPullDown = onPullDown
         context.coordinator.onPullDownEnded = onPullDownEnded
+        context.coordinator.watchAppState(vc, player: player)
         return vc
     }
     func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
@@ -62,6 +63,46 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
         var onPullDown: ((CGFloat) -> Void)?
         var onPullDownEnded: ((CGFloat, CGFloat) -> Void)?
         private var isFullScreen = false
+        private weak var controller: AVPlayerViewController?
+        private var player: AVPlayer?
+        private var observers: [NSObjectProtocol] = []
+
+        /// Back from the background, the picture stayed frozen while the sound went on: the player view
+        /// loses its video output when the app leaves (audio keeps playing in the background), and AVKit
+        /// doesn't always reconnect it. Detach the player while in the background (unless Picture in
+        /// Picture holds it), reattach on return, and seek to the current time so a fresh frame draws.
+        func watchAppState(_ vc: AVPlayerViewController, player: AVPlayer) {
+            controller = vc
+            self.player = player
+            guard observers.isEmpty else { return }
+            let center = NotificationCenter.default
+            observers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let vc = self.controller, !VideoPlayerModel.shared.isPictureInPictureActive else { return }
+                    vc.player = nil
+                }
+            })
+            observers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.reattach() }
+            })
+            observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.reattach() }
+            })
+        }
+
+        @MainActor private func reattach() {
+            guard let vc = controller, let player else { return }
+            if vc.player !== player { vc.player = player }
+            guard let item = player.currentItem, item.status == .readyToPlay else { return }
+            let now = player.currentTime()
+            guard now.isValid, now.seconds.isFinite else { return }
+            let wasPlaying = player.timeControlStatus != .paused
+            player.seek(to: now, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+                if wasPlaying { Task { @MainActor in if player.rate == 0 { player.play() } } }
+            }
+        }
+
+        isolated deinit { observers.forEach(NotificationCenter.default.removeObserver) }
 
         @objc func pan(_ pan: UIPanGestureRecognizer) {
             // Window coordinates: the video itself moves with the finger.
