@@ -15,6 +15,7 @@ struct MusicSearchView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var voice = VoiceSearch()
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         List {
@@ -59,7 +60,7 @@ struct MusicSearchView: View {
                     .listRowInsets(EdgeInsets(top: Spacing.xxs, leading: 0, bottom: Spacing.xxs, trailing: 0))
                 }
                 if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear).listRowSeparator(.hidden) }
-                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } }.listRowBackground(Color.clear).listRowSeparator(.hidden) }
+                if let error, results.isEmpty { ErrorView(message: error) { startSearch() }.listRowBackground(Color.clear).listRowSeparator(.hidden) }
                 Section {
                     ForEach(Array(results.enumerated()), id: \.element.id) { i, card in
                         resultRow(card, index: i)
@@ -85,14 +86,20 @@ struct MusicSearchView: View {
         }
         .onSubmit(of: .search) { submit(query) }
         .onChange(of: query) { _, new in
-            if new.isEmpty { submitted = ""; results = [] }
-            Task {
-                try? await Task.sleep(for: .milliseconds(250))
-                guard new == query, !new.isEmpty, new != submitted else { suggestions = []; return }
-                suggestions = await MusicAPI.suggestions(new)
-            }
+            if new.isEmpty { searchTask?.cancel(); submitted = ""; results = []; continuation = nil; error = nil; loading = false }
         }
-        .onChange(of: filter) { Task { await search() } }
+        // Restarts (cancelling the previous one) on every keystroke, so a slow answer for an older
+        // prefix can never replace the suggestions for what is typed now.
+        .task(id: query) {
+            let q = query
+            guard !q.isEmpty, q != submitted else { suggestions = []; return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let found = await MusicAPI.suggestions(q)
+            guard !Task.isCancelled, q == query, q != submitted else { return }
+            suggestions = found
+        }
+        .onChange(of: filter) { startSearch() }
         .onChange(of: app.searchRequest, initial: true) { _, request in
             guard let request else { return }
             app.searchRequest = nil
@@ -100,6 +107,8 @@ struct MusicSearchView: View {
         }
         .onChange(of: voice.transcript) { _, t in if !t.isEmpty { query = t } }
         .onChange(of: voice.isRecording) { _, rec in if !rec, !voice.transcript.isEmpty { submit(voice.transcript) } }
+        // Leaving Search mid-sentence turns the microphone off instead of leaving it on for the time limit.
+        .onDisappear { if voice.isRecording { voice.stop() } }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { voice.toggle() } label: {
@@ -132,27 +141,47 @@ struct MusicSearchView: View {
     }
 
     private func submit(_ q: String) {
+        let q = q.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
         searchFocused = false
         query = q
         submitted = q
         suggestions = []
         library.addSearch(q, mode: .music)
-        Task { await search() }
+        startSearch()
+    }
+
+    /// One search at a time: a newer query or filter cancels the one in flight, so its late
+    /// answer can't replace the newer results.
+    private func startSearch() {
+        searchTask?.cancel()
+        searchTask = Task { await search() }
     }
 
     private func search() async {
         guard !submitted.isEmpty else { return }
+        let q = submitted, f = filter
         loading = true; error = nil
-        defer { loading = false }
+        // The previous query's next page must not be appended to this one's results.
+        continuation = nil
+        defer { if !Task.isCancelled { loading = false } }
         do {
-            let (items, next) = try await MusicAPI.search(submitted, filter: filter)
+            let (items, next) = try await MusicAPI.search(q, filter: f)
+            guard !Task.isCancelled, q == submitted, f == filter else { return }
             results = items; continuation = next
-        } catch { self.error = error.localizedDescription; results = [] }
+        } catch {
+            guard !Task.isCancelled, q == submitted, f == filter else { return }
+            self.error = error.localizedDescription; results = []
+        }
     }
 
     private func loadMore() async {
         guard let token = continuation else { return }
-        if let (items, next) = try? await MusicAPI.search(submitted, filter: filter, continuation: token) {
+        let q = submitted, f = filter
+        let page = try? await MusicAPI.search(q, filter: f, continuation: token)
+        // A new search started meanwhile: this page belongs to the old results.
+        guard !Task.isCancelled, continuation == token, q == submitted, f == filter else { return }
+        if let (items, next) = page {
             let ids = Set(results.map(\.id))
             let fresh = items.filter { !ids.contains($0.id) }
             results += fresh
@@ -171,6 +200,8 @@ final class VoiceSearch {
     @ObservationIgnored private let engine = AVAudioEngine()
     @ObservationIgnored private var task: SFSpeechRecognitionTask?
     @ObservationIgnored private var request: SFSpeechAudioBufferRecognitionRequest?
+    /// Counts recording sessions, so a late callback or time limit from an earlier one can't stop this one.
+    @ObservationIgnored private var recording = 0
 
     func toggle() { isRecording ? stop() : start() }
 
@@ -202,15 +233,18 @@ final class VoiceSearch {
         engine.prepare()
         guard (try? engine.start()) != nil else { return }
         isRecording = true
+        recording += 1
+        let id = recording
         task = recognizer.recognitionTask(with: request) { @Sendable result, error in
             let text = result?.bestTranscription.formattedString
             let final = result?.isFinal ?? false
             Task { @MainActor in
+                guard id == self.recording else { return }
                 if let text { self.transcript = text }
                 if final || error != nil { self.stop() }
             }
         }
-        Task { try? await Task.sleep(for: .seconds(6)); if self.isRecording { self.stop() } }
+        Task { try? await Task.sleep(for: .seconds(6)); if self.isRecording, id == self.recording { self.stop() } }
     }
 
     /// The tap runs on the audio render thread, so it is built outside the main actor.

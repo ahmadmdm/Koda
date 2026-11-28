@@ -127,8 +127,13 @@ final class ShortPlayer {
 
     private func observe(_ item: AVPlayerItem) {
         statusObservation = item.observe(\.status) { @Sendable [weak self] item, _ in
-            let ready = item.status == .readyToPlay
-            Task { @MainActor in if ready { self?.isReady = true } }
+            let status = item.status
+            // A stream that fails to load would otherwise leave the spinner up for good.
+            let failure = status == .failed ? (item.error?.localizedDescription ?? String(localized: "Couldn't load")) : nil
+            Task { @MainActor in
+                if status == .readyToPlay { self?.isReady = true }
+                if let failure { self?.error = failure }
+            }
         }
         sizeObservation = item.observe(\.presentationSize) { @Sendable [weak self] item, _ in
             let size = item.presentationSize
@@ -392,8 +397,14 @@ struct ShortPageView: View {
             actionButton(liked ? "hand.thumbsup.fill" : "hand.thumbsup", details?.likes ?? String(localized: "Like")) {
                 library.toggleVideoLike(video)
             }
+            // The visible label is the like count; VoiceOver hears what the button does.
+            .accessibilityLabel("Like")
+            .accessibilityValue(details?.likes ?? "")
+            .accessibilityAddTraits(liked ? .isSelected : [])
             if details?.commentsToken != nil {
                 actionButton("text.bubble.fill", details?.commentCount ?? String(localized: "Comments"), action: onComments)
+                    .accessibilityLabel("Comments")
+                    .accessibilityValue(details?.commentCount ?? "")
             }
             ShareLink(item: item.shareURL) {
                 actionLabel("arrowshape.turn.up.right.fill", String(localized: "Share"))
@@ -423,6 +434,7 @@ struct ShortPageView: View {
             } label: {
                 actionLabel("ellipsis", nil)
             }
+            .accessibilityLabel("More")
         }
         .padding(.trailing, 12)
         .padding(.bottom, insets.bottom + 24)

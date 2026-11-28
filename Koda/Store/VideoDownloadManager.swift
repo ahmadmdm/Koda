@@ -207,7 +207,7 @@ final class VideoDownloadManager {
 
     /// Each variant's size, keyed by its BANDWIDTH: YouTube's playlist URIs carry the video and audio
     /// files' byte counts (`clen=`), which are far closer than BANDWIDTH × duration (BANDWIDTH is a peak).
-    nonisolated static func variantSizes(_ master: URL) async -> [Int: Int64] {
+    @concurrent nonisolated static func variantSizes(_ master: URL) async -> [Int: Int64] {
         var request = URLRequest(url: master)
         request.setValue(InnerTube.userAgent(for: master), forHTTPHeaderField: "User-Agent")
         guard let (data, _) = try? await URLSession.shared.data(for: request), let text = String(data: data, encoding: .utf8) else { return [:] }
@@ -356,7 +356,6 @@ final class VideoDownloadManager {
             } catch {
                 guard fileTasks[id]?.token == token else { return }
                 fileTasks[id] = nil
-                try? FileManager.default.removeItem(at: target.appendingPathExtension("part"))
                 fail(id, error)
             }
         }
@@ -397,20 +396,35 @@ final class VideoDownloadManager {
         }
     }
 
-    fileprivate func willDownload(_ id: String, to location: URL) {
+    /// A callback from a task this download no longer runs: one cancelled, with a new download of
+    /// the same video started before the old task reported back.
+    private func isStale(_ id: String, task: Int?) -> Bool {
+        guard let task, let current = hlsTasks[id] else { return false }
+        return current.taskIdentifier != task
+    }
+
+    fileprivate func willDownload(_ id: String, to location: URL, task: Int? = nil) {
+        guard !isStale(id, task: task) else {
+            // The old task's package: nothing will ever refer to it.
+            cancelledPaths[id] = Self.relative(location)
+            return
+        }
         pending[id]?.relativePath = Self.relative(location)
     }
 
-    fileprivate func progress(_ id: String, _ value: Double) {
+    fileprivate func progress(_ id: String, _ value: Double, task: Int? = nil) {
+        guard !isStale(id, task: task) else { return }
         guard hlsTasks[id] != nil || pending[id] != nil else { return }
         if case .downloading(let old) = states[id], value <= old { return }
         if case .failed = states[id] { return }
         states[id] = .downloading(min(value, 1))
     }
 
-    fileprivate func completed(_ id: String, location: URL?, error: (any Error)?) {
-        hlsTasks[id] = nil
+    fileprivate func completed(_ id: String, location: URL?, error: (any Error)?, task: Int? = nil) {
         if let path = cancelledPaths.removeValue(forKey: id) { try? FileManager.default.removeItem(at: Self.absolute(path)) }
+        // The cancelled task of an earlier try: the running one owns `pending` and the package.
+        if isStale(id, task: task) { return }
+        hlsTasks[id] = nil
         let path = location.map(Self.relative) ?? pending[id]?.relativePath
         if let error {
             if (error as? URLError)?.code == .cancelled || (error as NSError).code == NSURLErrorCancelled {
@@ -442,7 +456,7 @@ final class VideoDownloadManager {
     }
 
     /// Downloads already retried once after a refused stream.
-    private var autoRetried: Set<String> = []
+    @ObservationIgnored private var autoRetried: Set<String> = []
 
     nonisolated static func isRefusal(_ error: any Error) -> Bool {
         let ns = error as NSError
@@ -519,31 +533,32 @@ final class VideoDownloadSessionDelegate: NSObject, AVAssetDownloadDelegate {
     @MainActor private var manager: VideoDownloadManager? { .shared }
 
     nonisolated func urlSession(_ session: URLSession, assetDownloadTask: AVAssetDownloadTask, willDownloadTo location: URL) {
-        let id = assetDownloadTask.taskDescription
-        MainActor.assumeIsolated { if let id { manager?.willDownload(id, to: location) } }
+        let id = assetDownloadTask.taskDescription, task = assetDownloadTask.taskIdentifier
+        MainActor.assumeIsolated { if let id { manager?.willDownload(id, to: location, task: task) } }
     }
 
     nonisolated func urlSession(_ session: URLSession, assetDownloadTask: AVAssetDownloadTask, didFinishDownloadingTo location: URL) {
-        let id = assetDownloadTask.taskDescription
-        MainActor.assumeIsolated { if let id { manager?.willDownload(id, to: location) } }
+        let id = assetDownloadTask.taskDescription, task = assetDownloadTask.taskIdentifier
+        MainActor.assumeIsolated { if let id { manager?.willDownload(id, to: location, task: task) } }
     }
 
     nonisolated func urlSession(_ session: URLSession, assetDownloadTask: AVAssetDownloadTask, didLoad timeRange: CMTimeRange,
                                 totalTimeRangesLoaded loadedTimeRanges: [NSValue], timeRangeExpectedToLoad: CMTimeRange) {
-        let id = assetDownloadTask.taskDescription
+        let id = assetDownloadTask.taskDescription, task = assetDownloadTask.taskIdentifier
         let expected = timeRangeExpectedToLoad.duration.seconds
         let loaded = loadedTimeRanges.reduce(0.0) { $0 + $1.timeRangeValue.duration.seconds }
         guard expected > 0 else { return }
-        MainActor.assumeIsolated { if let id { manager?.progress(id, loaded / expected) } }
+        MainActor.assumeIsolated { if let id { manager?.progress(id, loaded / expected, task: task) } }
     }
 
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         guard task is AVAssetDownloadTask, let id = task.taskDescription else { return }
         let message = error.map { $0 as NSError }
+        let taskId = task.taskIdentifier
         MainActor.assumeIsolated {
             guard let manager else { return }
             let location = manager.pending[id]?.relativePath.map(VideoDownloadManager.absolute)
-            manager.completed(id, location: location, error: message)
+            manager.completed(id, location: location, error: message, task: taskId)
         }
     }
 

@@ -49,7 +49,10 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
     func updateUIViewController(_ vc: AVPlayerViewController, context: Context) {
         context.coordinator.onPullDown = onPullDown
         context.coordinator.onPullDownEnded = onPullDownEnded
-        if vc.player !== player { vc.player = player }
+        // Keep the coordinator on the current player, and don't undo the background detach here:
+        // SwiftUI can update the view while the app is in the background.
+        context.coordinator.watchAppState(vc, player: player)
+        if !context.coordinator.isDetached, vc.player !== player { vc.player = player }
         let pip = UserDefaults.standard.object(forKey: "pictureInPicture") as? Bool ?? true
         if vc.allowsPictureInPicturePlayback != pip {
             vc.allowsPictureInPicturePlayback = pip
@@ -65,6 +68,8 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
         private var isFullScreen = false
         private weak var controller: AVPlayerViewController?
         private var player: AVPlayer?
+        /// The player was taken off the controller when the app went to the background.
+        private(set) var isDetached = false
         private var observers: [NSObjectProtocol] = []
 
         /// Back from the background, the picture stayed frozen while the sound went on: the player view
@@ -80,6 +85,7 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
                 MainActor.assumeIsolated {
                     guard let self, let vc = self.controller, !VideoPlayerModel.shared.isPictureInPictureActive else { return }
                     vc.player = nil
+                    self.isDetached = true
                 }
             })
             observers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
@@ -91,7 +97,10 @@ struct SystemVideoPlayer: UIViewControllerRepresentable {
         }
 
         @MainActor private func reattach() {
-            guard let vc = controller, let player else { return }
+            // Both foreground notifications arrive on return, and didBecomeActive also follows a
+            // Control Center or notification pull-down: reattach and seek once, after a real detach.
+            guard isDetached, let vc = controller, let player else { return }
+            isDetached = false
             if vc.player !== player { vc.player = player }
             guard let item = player.currentItem, item.status == .readyToPlay else { return }
             let now = player.currentTime()
@@ -299,7 +308,11 @@ struct WatchView: View {
         .sheet(isPresented: Binding(get: { PictureAdjustState.shared.isPresented }, set: { PictureAdjustState.shared.isPresented = $0 })) {
             PictureAdjustSheet()
         }
-        .onChange(of: model.current?.id) { sidePanel = .related }
+        .onChange(of: model.current?.id) {
+            // A new video: its chat isn't the old one's, and its comments start on Related.
+            sidePanel = .related
+            showChat = false
+        }
         .toastOverlay()
     }
 
@@ -389,7 +402,7 @@ struct WatchView: View {
                 VStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle.fill").font(.largeTitle)
                     Text(e).multilineTextAlignment(.center).font(.callout)
-                    if let v = model.current { Button("Retry") { let c = v; model.close(); model.open(c) }.buttonStyle(.glass) }
+                    if model.current != nil { Button("Retry") { model.retry() }.buttonStyle(.glass) }
                 }.foregroundStyle(.white).padding()
             }
         }
@@ -567,15 +580,19 @@ struct LinkedText: View {
             })
     }
 
+    // Built once: creating a detector and a regex for every comment on every render is costly.
+    private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    private static let timestampRegex = try? NSRegularExpression(pattern: #"\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b"#)
+
     private var attributed: AttributedString {
         var result = AttributedString(text)
         let ns = text as NSString
-        if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
+        if let detector = Self.linkDetector {
             for m in detector.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
                 if let r = Range(m.range, in: result), let url = m.url { result[r].link = url; result[r].foregroundColor = .accentColor }
             }
         }
-        let regex = try! NSRegularExpression(pattern: #"\b(?:\d{1,2}:)?\d{1,2}:\d{2}\b"#)
+        guard let regex = Self.timestampRegex else { return result }
         for m in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
             if let r = Range(m.range, in: result), let secs = ns.substring(with: m.range).durationSeconds {
                 result[r].link = URL(string: "koda-seek://\(secs)")
@@ -622,20 +639,36 @@ struct CommentsView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
-        .task {
-            do { (comments, next) = try await VideoAPI.comments(token: token, endpoint: endpoint) } catch { self.error = error.localizedDescription }
+        // Keyed by the token: the sheet stays up when the next video starts, and must not keep the
+        // old video's comments.
+        .task(id: token) {
+            comments = []; next = nil; error = nil; loading = true
+            do {
+                let (c, n) = try await VideoAPI.comments(token: token, endpoint: endpoint)
+                comments = c; next = n
+            } catch {
+                if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
+                self.error = error.localizedDescription
+            }
             loading = false
         }
     }
 
     private func more() async {
         guard let token = next else { return }
-        if let (c, n) = try? await VideoAPI.comments(token: token, endpoint: endpoint), !c.isEmpty {
+        do {
+            let (c, n) = try await VideoAPI.comments(token: token, endpoint: endpoint)
+            // Another video's comments, or this page already handled: drop it.
+            guard next == token else { return }
             let ids = Set(comments.map(\.id))
             let fresh = c.filter { !ids.contains($0.id) }
             comments += fresh
             // A page that adds nothing new would only bring the same spinner back.
             next = n == token || fresh.isEmpty ? nil : n
-        } else { next = nil }
+        } catch {
+            // Scrolling the spinner away cancels the request; it should load again when it's back.
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
+            next = nil
+        }
     }
 }

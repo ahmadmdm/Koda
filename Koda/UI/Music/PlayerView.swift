@@ -241,7 +241,10 @@ struct SeekBar: View {
                 .frame(maxHeight: .infinity)
                 .contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { g in dragging = min(max(0, g.location.x / geo.size.width), 1) * duration }
+                    .onChanged { g in
+                        guard geo.size.width > 0 else { return }
+                        dragging = min(max(0, g.location.x / geo.size.width), 1) * duration
+                    }
                     .onEnded { _ in if let d = dragging { player.seek(to: d) }; dragging = nil })
                 .animation(.spring(duration: 0.25), value: dragging == nil)
             }
@@ -344,13 +347,18 @@ struct PlayerMenu: View {
         Menu {
             if let song = player.current {
                 Button("Add to Playlist…", systemImage: "text.badge.plus") { app.addToPlaylist = [song] }
-                if !downloads.isDownloaded(song.id) {
+                // An imported file has nothing to download, no radio and no YouTube link (as in `SongMenuItems`).
+                if !song.isLocal, !downloads.isDownloaded(song.id) {
                     Button("Download", systemImage: "arrow.down.circle") { downloads.download([song]) }
                 }
-                Button("Start Radio", systemImage: "dot.radiowaves.left.and.right") { player.startRadio(from: song) }
+                if !song.isLocal {
+                    Button("Start Radio", systemImage: "dot.radiowaves.left.and.right") { player.startRadio(from: song) }
+                }
                 if let id = song.artistId { Button("Go to Artist", systemImage: "music.microphone") { app.navigate(.artist(id)) } }
                 if let id = song.albumId { Button("Go to Album", systemImage: "square.stack") { app.navigate(.album(id)) } }
-                ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(song.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
+                if !song.isLocal, let url = URL(string: "https://music.youtube.com/watch?v=\(song.id)") {
+                    ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
+                }
             }
             Divider()
             Menu("Playback Speed", systemImage: "gauge.with.dots.needle.67percent") {
@@ -552,7 +560,6 @@ struct BentoStyle: View {
 struct DialStyle: View {
     var onLongPress: () -> Void
     @Environment(MusicPlayer.self) private var player
-    @State private var spin: Double = 0
 
     var body: some View {
         VStack(spacing: 22) {

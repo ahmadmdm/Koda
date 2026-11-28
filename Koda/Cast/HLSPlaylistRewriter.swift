@@ -115,7 +115,9 @@ nonisolated enum HLSPlaylistRewriter {
                 continue
             }
             if line.hasPrefix("#") {
-                out.append(line.contains("URI=\"") ? rewriteURIAttribute(line, base: base, resource: .playlist, proxy: proxy) : line)
+                // A session key is fetched as bytes, not a playlist the proxy would parse as text.
+                let resource: Resource = line.hasPrefix("#EXT-X-SESSION-KEY:") ? .segment : .playlist
+                out.append(line.contains("URI=\"") ? rewriteURIAttribute(line, base: base, resource: resource, proxy: proxy) : line)
                 continue
             }
             // A variant's URI: drop it, and its #EXT-X-STREAM-INF, unless it was kept.
@@ -136,7 +138,10 @@ nonisolated enum HLSPlaylistRewriter {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty { continue }
             if line.hasPrefix("#") {
-                out.append(line.contains("URI=\"") ? rewriteURIAttribute(line, base: base, resource: .segment, proxy: proxy) : line)
+                // Keys, init sections (EXT-X-MAP), parts and hints are bytes; a rendition report names
+                // another media playlist, which has to be rewritten too.
+                let resource: Resource = line.hasPrefix("#EXT-X-RENDITION-REPORT:") ? .playlist : .segment
+                out.append(line.contains("URI=\"") ? rewriteURIAttribute(line, base: base, resource: resource, proxy: proxy) : line)
             } else {
                 out.append(proxyURL(line, base: base, resource: .segment, proxy: proxy) ?? line)
             }

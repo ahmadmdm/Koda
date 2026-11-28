@@ -14,6 +14,21 @@ nonisolated struct YouTubeAccount: Codable, Hashable, Identifiable, Sendable {
     var expired = false
 }
 
+/// `expired` came later: a stored account without it is not expired. Synthesized decoding would
+/// reject the whole list, and the next save would sign every account out.
+nonisolated extension YouTubeAccount {
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID(),
+                  cookies: try c.decode(String.self, forKey: .cookies),
+                  name: try c.decodeIfPresent(String.self, forKey: .name),
+                  handle: try c.decodeIfPresent(String.self, forKey: .handle),
+                  avatar: try c.decodeIfPresent(String.self, forKey: .avatar),
+                  datasyncId: try c.decodeIfPresent(String.self, forKey: .datasyncId),
+                  expired: try c.decodeIfPresent(Bool.self, forKey: .expired) ?? false)
+    }
+}
+
 /// The signed-in accounts and which one is active. Cookies are a credential: they live in the
 /// Keychain (this device only, never in backups), never in UserDefaults or the library file.
 nonisolated final class AccountSession: @unchecked Sendable {
@@ -24,6 +39,9 @@ nonisolated final class AccountSession: @unchecked Sendable {
     @TaskLocal static var signingAccount: UUID?
 
     private let lock = NSLock()
+    /// Held across a snapshot and its Keychain write, so concurrent saves (cookie rotations from
+    /// parallel requests) land in order and an older snapshot never overwrites a newer one.
+    private let persistLock = NSLock()
     private var accounts: [YouTubeAccount] = []
     private var activeId: UUID?
 
@@ -78,12 +96,15 @@ nonisolated final class AccountSession: @unchecked Sendable {
             if let name { accounts[i].name = name }
             if let handle { accounts[i].handle = handle }
             if let avatar { accounts[i].avatar = avatar }
+            accounts[i].expired = false
             if let datasyncId {
                 accounts[i].datasyncId = datasyncId
                 // Signing back into an account already in the list: keep the newer session only.
-                accounts.removeAll { $0.id != id && $0.datasyncId == datasyncId }
+                // (`i` is stale after this.) The active one may be the row that goes: this one takes its place.
+                let removed = Set(accounts.filter { $0.id != id && $0.datasyncId == datasyncId }.map(\.id))
+                accounts.removeAll { removed.contains($0.id) }
+                if let active = activeId, removed.contains(active) { activeId = id }
             }
-            accounts[i].expired = false
         }
         persist(changedIdentity: false)
     }
@@ -114,8 +135,10 @@ nonisolated final class AccountSession: @unchecked Sendable {
     }
 
     private func persist(changedIdentity: Bool) {
-        let snapshot = lock.withLock { Stored(accounts: accounts, activeId: activeId) }
-        if let data = try? JSONEncoder().encode(snapshot) { Keychain.write(data) }
+        persistLock.withLock {
+            let snapshot = lock.withLock { Stored(accounts: accounts, activeId: activeId) }
+            if let data = try? JSONEncoder().encode(snapshot) { Keychain.write(data) }
+        }
         if changedIdentity {
             // The visitor token is the anti-bot identity: never replay one account's under another.
             UserDefaults.standard.removeObject(forKey: "visitorData")

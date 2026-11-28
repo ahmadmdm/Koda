@@ -133,12 +133,12 @@ struct RecapView: View {
                         Text("Your record").font(.title3)
                         record.frame(width: 240, height: 240)
                         Text("One ring for each day, in the colours of your covers.").font(.footnote).opacity(0.8)
-                        // ImageRenderer draws the card on the main thread: once per render, not twice.
-                        let share = renderShare(top: top)
-                        ShareLink(item: share, preview: SharePreview("My Koda Recap", image: share)) {
-                            Label("Share", systemImage: "square.and.arrow.up")
+                        if let share = shareImage {
+                            ShareLink(item: share, preview: SharePreview("My Koda Recap", image: share)) {
+                                Label("Share", systemImage: "square.and.arrow.up")
+                            }
+                            .buttonStyle(.glass)
                         }
-                        .buttonStyle(.glass)
                     }
                 }
             }
@@ -146,6 +146,11 @@ struct RecapView: View {
         }
         .readableContentWidth(640)
         .navigationTitle("Recap")
+        // ImageRenderer draws on the main thread. Every play recorded redraws this screen, so the
+        // card is drawn only when what it shows (the period, the top five) changes.
+        .task(id: [period.rawValue, layoutDirection == .rightToLeft ? "rtl" : "ltr", locale.identifier] + top.map(\.song.id)) {
+            shareImage = top.isEmpty ? nil : renderShare(top: top)
+        }
     }
 
     private func peakLabel(_ h: Int) -> String {

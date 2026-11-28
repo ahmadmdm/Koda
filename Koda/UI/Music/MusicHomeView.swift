@@ -118,7 +118,10 @@ struct MusicHomeView: View {
 
     private func loadMore() async {
         guard let token = continuation else { return }
-        if let more = try? await MusicAPI.home(continuation: token) {
+        let page = try? await MusicAPI.home(continuation: token)
+        // A pull to refresh meanwhile replaced the shelves and the token: this page is for the old ones.
+        guard !Task.isCancelled, continuation == token else { return }
+        if let more = page {
             let existing = Set(shelves.map(\.title))
             let fresh = more.shelves.filter { !existing.contains($0.title) }
             shelves += fresh

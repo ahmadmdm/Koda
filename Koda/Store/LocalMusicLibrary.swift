@@ -25,6 +25,7 @@ final class LocalMusicLibrary {
     @ObservationIgnored private var index: [String: Entry] = [:]
     /// A rescan was asked for while one ran: files may have arrived after it listed the folder.
     @ObservationIgnored private var rescanRequested = false
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     nonisolated struct Entry: Codable, Sendable {
         var song: Song
@@ -143,14 +144,21 @@ final class LocalMusicLibrary {
     /// Copies picked files into Documents/Music. Returns how many were added.
     @discardableResult
     func importFiles(_ urls: [URL]) async -> Int {
+        let added = await Self.copyIn(urls)
+        await rescan()
+        return added
+    }
+
+    /// Off the main actor: the files can be hundreds of megabytes.
+    @concurrent
+    private nonisolated static func copyIn(_ urls: [URL]) async -> Int {
         var added = 0
-        for url in urls where Self.fileExtensions.contains(url.pathExtension.lowercased()) {
+        for url in urls where fileExtensions.contains(url.pathExtension.lowercased()) {
             let access = url.startAccessingSecurityScopedResource()
             defer { if access { url.stopAccessingSecurityScopedResource() } }
-            let target = Self.uniqueTarget(for: url.lastPathComponent)
+            let target = uniqueTarget(for: url.lastPathComponent)
             if (try? FileManager.default.copyItem(at: url, to: target)) != nil { added += 1 }
         }
-        await rescan()
         return added
     }
 
@@ -168,7 +176,10 @@ final class LocalMusicLibrary {
     private func save() {
         let snapshot = index
         let url = Self.indexURL
-        Task.detached(priority: .utility) {
+        // One after another, so an older index never lands on top of a newer one.
+        let previous = saveTask
+        saveTask = Task.detached(priority: .utility) {
+            await previous?.value
             if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: url, options: .atomic) }
         }
     }
@@ -177,7 +188,7 @@ final class LocalMusicLibrary {
         songs.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    private static func uniqueTarget(for name: String) -> URL {
+    private nonisolated static func uniqueTarget(for name: String) -> URL {
         let base = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
         var candidate = directory.appendingPathComponent(name)

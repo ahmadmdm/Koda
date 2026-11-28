@@ -84,13 +84,15 @@ struct MusicLibraryView: View {
     }
 }
 
-enum PlaylistCSV {
-    static func export(_ playlist: LocalPlaylist) -> URL {
+nonisolated enum PlaylistCSV {
+    static func export(_ playlist: LocalPlaylist) throws -> URL {
         var csv = "videoId,title,artist,album,duration\n"
         func q(_ s: String?) -> String { "\"" + (s ?? "").replacingOccurrences(of: "\"", with: "\"\"") + "\"" }
         for s in playlist.songs { csv += [s.id, q(s.title), q(s.artist), q(s.album), s.duration.map(String.init) ?? ""].joined(separator: ",") + "\n" }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(playlist.name).csv")
-        try? csv.write(to: url, atomically: true, encoding: .utf8)
+        // A "/" or ":" in the name would point the file at a folder that doesn't exist.
+        let safeName = playlist.name.components(separatedBy: CharacterSet(charactersIn: "/:")).joined(separator: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName.isEmpty ? "Playlist" : safeName).csv")
+        try csv.write(to: url, atomically: true, encoding: .utf8)
         return url
     }
 
@@ -114,6 +116,14 @@ enum PlaylistCSV {
         }
         out.append(cur)
         return out
+    }
+}
+
+/// A playlist's CSV, written only when it is actually shared rather than on every redraw of the menu.
+nonisolated struct PlaylistCSVFile: Transferable {
+    var playlist: LocalPlaylist
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .commaSeparatedText) { SentTransferredFile(try PlaylistCSV.export($0.playlist)) }
     }
 }
 
@@ -142,13 +152,19 @@ struct LocalPlaylistView: View {
                 if playlist.songs.isEmpty {
                     ContentUnavailableView("Empty playlist", systemImage: "music.note.list", description: Text("Add songs from any song's menu."))
                 }
-                ForEach(Array(songs.enumerated()), id: \.element.id) { i, song in
+                // By position: an imported CSV or a saved queue can hold the same song twice.
+                ForEach(Array(songs.enumerated()), id: \.offset) { i, song in
                     SongRow(song: song) { player.play(songs, startAt: i) }
                 }
                 .onDelete { idx in
                     var p = playlist
-                    let ids = Set(idx.map { songs[$0].id })
-                    p.songs.removeAll { ids.contains($0.id) }
+                    if sort == .original {
+                        // Offsets match the stored order: remove exactly the rows swiped, not every copy.
+                        p.songs.remove(atOffsets: idx)
+                    } else {
+                        let ids = Set(idx.map { songs[$0].id })
+                        p.songs.removeAll { ids.contains($0.id) }
+                    }
                     library.updatePlaylist(p)
                 }
                 .onMove { from, to in
@@ -165,7 +181,9 @@ struct LocalPlaylistView: View {
                         Picker("Sort", selection: $sort) { ForEach(SongSort.allCases) { Text($0.title).tag($0) } }
                         Button("Rename", systemImage: "pencil") { name = playlist.name; renaming = true }
                         Button("New Cover Colour", systemImage: "paintpalette") { var p = playlist; p.coverHue = .random(in: 0...1); library.updatePlaylist(p) }
-                        ShareLink(item: PlaylistCSV.export(playlist)) { Label("Export CSV", systemImage: "square.and.arrow.up") }
+                        ShareLink(item: PlaylistCSVFile(playlist: playlist), preview: SharePreview(playlist.name)) {
+                            Label("Export CSV", systemImage: "square.and.arrow.up")
+                        }
                         Button("Delete Playlist", systemImage: "trash", role: .destructive) { library.deletePlaylist(playlist.id); dismiss() }
                     } label: { Image(systemName: "ellipsis.circle") }
                     .accessibilityLabel("More")
@@ -361,9 +379,16 @@ struct AccountMusicLibrarySection: View {
         .task(id: account.active?.id) {
             let key = account.active?.id.uuidString ?? ""
             guard loadStamp?.isFresh(for: key) != true else { return }
-            playlists = (try? await AccountAPI.libraryPlaylists()) ?? []
-            albums = (try? await AccountAPI.libraryAlbums()) ?? []
-            if !Task.isCancelled, !(playlists + albums).isEmpty { loadStamp = LoadStamp(key: key) }
+            // Another account's playlists must not stay under this account's name while it loads.
+            if let stamp = loadStamp, stamp.key != key { playlists = []; albums = []; loadStamp = nil }
+            async let p = try? AccountAPI.libraryPlaylists()
+            async let a = try? AccountAPI.libraryAlbums()
+            let (newPlaylists, newAlbums) = await (p ?? [], a ?? [])
+            // Cancelled (the screen was left, or the account switched): keep what is shown.
+            guard !Task.isCancelled else { return }
+            playlists = newPlaylists
+            albums = newAlbums
+            if !(playlists + albums).isEmpty { loadStamp = LoadStamp(key: key) }
         }
     }
 }

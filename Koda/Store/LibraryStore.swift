@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import Synchronization
 
 nonisolated struct LikedSong: Codable, Hashable, Sendable { var song: Song; var date: Date }
 
@@ -55,6 +56,51 @@ nonisolated struct LibraryData: Codable, Sendable {
     var tasteArtists: [String] = []
 }
 
+/// A key missing from the file (a library or backup from before that list existed) reads as empty.
+/// Synthesized decoding would fail the whole document instead, and the next save would then
+/// overwrite the user's library with an empty one.
+nonisolated extension LibraryData {
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func list<T: Decodable>(_ key: CodingKeys) throws -> [T] { try c.decodeIfPresent([T].self, forKey: key) ?? [] }
+        self.init()
+        likedSongs = try list(.likedSongs)
+        playlists = try list(.playlists)
+        plays = try list(.plays)
+        savedCollections = try list(.savedCollections)
+        followedArtists = try list(.followedArtists)
+        musicSearches = try list(.musicSearches)
+        videoSearches = try list(.videoSearches)
+        videoHistory = try list(.videoHistory)
+        watchLater = try list(.watchLater)
+        likedVideos = try list(.likedVideos)
+        subscriptions = try list(.subscriptions)
+        hiddenChannels = try list(.hiddenChannels)
+        hiddenVideos = try list(.hiddenVideos)
+        downloads = try list(.downloads)
+        tasteArtists = try list(.tasteArtists)
+    }
+}
+
+/// Writes the library file one snapshot at a time, never an older snapshot over a newer one: the
+/// debounced background save and `flush` can otherwise race and leave stale data on disk.
+nonisolated final class LibraryWriter: Sendable {
+    let url: URL
+    private let written = Mutex<Int>(0)
+
+    init(url: URL) { self.url = url }
+
+    func write(_ data: LibraryData, generation: Int) {
+        written.withLock { last in
+            guard generation > last, let encoded = try? JSONEncoder().encode(data) else { return }
+            do {
+                try encoded.write(to: url, options: .atomic)
+                last = generation
+            } catch {}
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class LibraryStore {
@@ -62,12 +108,16 @@ final class LibraryStore {
 
     var data: LibraryData { didSet { derived = Derived(); scheduleSave() } }
 
-    private let url: URL = {
+    private static let fileURL: URL = {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("library.json")
     }()
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    @ObservationIgnored private let writer = LibraryWriter(url: LibraryStore.fileURL)
+    @ObservationIgnored private var generation = 0
+    /// The file is there but couldn't be read (still locked, say): saving would replace it.
+    @ObservationIgnored private var savingBlocked = false
 
     /// Values worked out from `plays`, kept until `data` next changes: Home, Speed dial and CarPlay
     /// ask for them on every render, and each is a pass over up to 20,000 plays.
@@ -79,12 +129,21 @@ final class LibraryStore {
     @ObservationIgnored private var derived = Derived()
 
     init() {
-        if let raw = try? Data(contentsOf: url), let decoded = try? JSONDecoder().decode(LibraryData.self, from: raw) {
+        let raw = try? Data(contentsOf: Self.fileURL)
+        if let raw, let decoded = try? JSONDecoder().decode(LibraryData.self, from: raw) {
             data = decoded
             data.videoSearches = data.videoSearches.map(\.decodingHTMLEntities)
             data.musicSearches = data.musicSearches.map(\.decodingHTMLEntities)
         } else {
             data = LibraryData()
+            let url = Self.fileURL
+            if raw != nil {
+                // A file that doesn't decode is kept aside rather than overwritten by the first save.
+                let aside = url.deletingPathExtension().appendingPathExtension("unreadable-\(Int(Date.now.timeIntervalSince1970)).json")
+                try? FileManager.default.moveItem(at: url, to: aside)
+            } else if FileManager.default.fileExists(atPath: url.path) {
+                savingBlocked = true
+            }
         }
     }
 
@@ -93,16 +152,20 @@ final class LibraryStore {
     func flush() {
         saveTask?.cancel()
         saveTask = nil
-        if let encoded = try? JSONEncoder().encode(data) { try? encoded.write(to: url, options: .atomic) }
+        guard !savingBlocked else { return }
+        generation += 1
+        writer.write(data, generation: generation)
     }
 
     private func scheduleSave() {
         saveTask?.cancel()
-        let snapshot = data, url = url
+        guard !savingBlocked else { return }
+        generation += 1
+        let snapshot = data, writer = writer, generation = generation
         saveTask = Task.detached(priority: .utility) {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            if let encoded = try? JSONEncoder().encode(snapshot) { try? encoded.write(to: url, options: .atomic) }
+            writer.write(snapshot, generation: generation)
         }
     }
 

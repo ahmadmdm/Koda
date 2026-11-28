@@ -277,6 +277,8 @@ struct VideoSearchView: View {
     @State private var suggestions: [String] = []
     @State private var loading = false
     @State private var error: String?
+    /// The running search, cancelled when a newer one starts so its results can't land last.
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         List {
@@ -317,7 +319,7 @@ struct VideoSearchView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: Spacing.xxs, leading: 0, bottom: Spacing.xxs, trailing: 0))
                 if loading && results.isEmpty { LoadingView().listRowBackground(Color.clear).listRowSeparator(.hidden) }
-                if let error, results.isEmpty { ErrorView(message: error) { Task { await search() } }.listRowSeparator(.hidden) }
+                if let error, results.isEmpty { ErrorView(message: error) { startSearch() }.listRowSeparator(.hidden) }
                 let videos = results.compactMap { if case .video(let v) = $0 { v } else { nil } }
                 ForEach(results) { r in
                     switch r {
@@ -360,15 +362,20 @@ struct VideoSearchView: View {
         }
         .onSubmit(of: .search) { submit(query) }
         .onChange(of: query) { _, new in
-            if new.isEmpty { submitted = ""; results = [] }
-            Task {
-                try? await Task.sleep(for: .milliseconds(250))
-                guard new == query, !new.isEmpty, new != submitted else { suggestions = []; return }
-                suggestions = await VideoAPI.suggestions(new)
-            }
+            if new.isEmpty { searchTask?.cancel(); submitted = ""; results = []; continuation = nil }
         }
-        .onChange(of: filter) { Task { await search() } }
-        .onChange(of: sort) { Task { await search() } }
+        // Debounced; typing again cancels the previous request.
+        .task(id: query) {
+            let q = query
+            guard !q.isEmpty, q != submitted else { suggestions = []; return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            let found = await VideoAPI.suggestions(q)
+            guard !Task.isCancelled, q == query, q != submitted else { return }
+            suggestions = found
+        }
+        .onChange(of: filter) { startSearch() }
+        .onChange(of: sort) { startSearch() }
         .toolbar { ToolbarItem(placement: .principal) { ModeSwitcher() } }
     }
 
@@ -377,25 +384,45 @@ struct VideoSearchView: View {
         let q = raw.decodingHTMLEntities
         query = q; submitted = q; suggestions = []
         library.addSearch(q, mode: .video)
-        Task { await search() }
+        startSearch()
+    }
+
+    private func startSearch() {
+        searchTask?.cancel()
+        searchTask = Task { await search() }
     }
 
     private func search() async {
         guard !submitted.isEmpty else { return }
-        loading = true; error = nil; defer { loading = false }
-        do { (results, continuation) = try await VideoAPI.search(submitted, filter: filter, sort: sort) }
-        catch { self.error = error.localizedDescription; results = [] }
+        // The old query's next page must not load (or land) while the new one is on its way.
+        loading = true; error = nil; continuation = nil
+        do {
+            let (found, next) = try await VideoAPI.search(submitted, filter: filter, sort: sort)
+            guard !Task.isCancelled else { return }
+            results = found; continuation = next
+        } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
+            self.error = error.localizedDescription; results = []
+        }
+        loading = false
     }
 
     private func loadMore() async {
         guard let token = continuation else { return }
-        if let (more, next) = try? await VideoAPI.search(submitted, filter: filter, continuation: token) {
+        do {
+            let (more, next) = try await VideoAPI.search(submitted, filter: filter, continuation: token)
+            // A new search started meanwhile: this page belongs to the old one.
+            guard continuation == token else { return }
             let ids = Set(results.map(\.id))
             let fresh = more.filter { !ids.contains($0.id) }
             results += fresh
             // A page that adds nothing new would only bring the same spinner back.
             continuation = fresh.isEmpty ? nil : next
-        } else { continuation = nil }
+        } catch {
+            // Scrolling the spinner away cancels the request; it should load again when it's back.
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
+            continuation = nil
+        }
     }
 }
 
@@ -444,10 +471,17 @@ struct ChannelView: View {
 
     private func loadMore(_ tab: ChannelTab, page: ChannelPage) async {
         guard let current = tabPages[tab.id], let token = current.continuation else { return }
-        guard let more = try? await VideoAPI.channelTab(page.id, tab: tab, name: page.name, continuation: token) else {
+        let more: ChannelTabPage
+        do {
+            more = try await VideoAPI.channelTab(page.id, tab: tab, name: page.name, continuation: token)
+        } catch {
+            // Scrolling the spinner away cancels the request; it should load again when it's back.
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled { return }
             tabPages[tab.id]?.continuation = nil; return
         }
-        let videoIds = Set(current.videos.map(\.id)), playlistIds = Set(current.playlists.map(\.id))
+        // This page was already added (or the tab reloaded) while it was on its way.
+        guard let latest = tabPages[tab.id], latest.continuation == token else { return }
+        let videoIds = Set(latest.videos.map(\.id)), playlistIds = Set(latest.playlists.map(\.id))
         let videos = more.videos.filter { !videoIds.contains($0.id) }, playlists = more.playlists.filter { !playlistIds.contains($0.id) }
         tabPages[tab.id]?.videos += videos
         tabPages[tab.id]?.playlists += playlists
@@ -753,7 +787,7 @@ struct SubscriptionsView: View {
     }
 
     private func load() async {
-        loading = true; defer { loading = false; loaded = true }
+        loading = true; defer { loading = false; if !Task.isCancelled { loaded = true } }
         let follows = follows
         let ids = follows.map(\.id)
         let avatars = Dictionary(follows.map { ($0.id, $0.avatar) }, uniquingKeysWith: { a, _ in a })
@@ -763,6 +797,9 @@ struct SubscriptionsView: View {
             if AccountAPI.isSignedIn { group.addTask { (try? await AccountAPI.subscriptionsFeed()) ?? [] } }
             for await vids in group { all += vids }
         }
+        // Cancelled (the account or the follows changed, or the tab left): the requests came back
+        // empty, and an empty feed here would replace the good one and show the error.
+        guard !Task.isCancelled else { return }
         var seen = Set<String>()
         all = all.filter { seen.insert($0.id).inserted }
         feed = library.filtered(all.map { var v = $0; v.channelAvatar = v.channelAvatar ?? v.channelId.flatMap { avatars[$0] ?? nil }; return v })

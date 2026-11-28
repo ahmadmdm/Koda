@@ -25,7 +25,10 @@ struct CollectionView: View {
     }
 
     private func load() async {
-        do { page = try await MusicAPI.collection(browseId); error = nil } catch { self.error = error.localizedDescription }
+        do { page = try await MusicAPI.collection(browseId); error = nil } catch {
+            // Leaving the page cancels the load; that's not an error to show when coming back.
+            if !Task.isCancelled { self.error = error.localizedDescription }
+        }
     }
 
     private func content(_ page: CollectionPage) -> some View {
@@ -48,7 +51,8 @@ struct CollectionView: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
 
-            ForEach(Array(songs.enumerated()), id: \.element.id) { i, song in
+            // By position: a YouTube playlist can list the same song more than once.
+            ForEach(Array(songs.enumerated()), id: \.offset) { i, song in
                 SongRow(song: song, index: i + 1, showArtwork: !page.isAlbum) { player.play(songs, startAt: i) }
             }
         }
@@ -143,7 +147,9 @@ struct ArtistView: View {
     }
 
     private func load() async {
-        do { page = try await MusicAPI.artist(browseId); error = nil } catch { self.error = error.localizedDescription }
+        do { page = try await MusicAPI.artist(browseId); error = nil } catch {
+            if !Task.isCancelled { self.error = error.localizedDescription }
+        }
     }
 
     private func content(_ page: ArtistPage) -> some View {

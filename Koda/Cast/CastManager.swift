@@ -52,8 +52,6 @@ final class CastManager: NSObject {
 
     @ObservationIgnored private(set) var lastStatus: CastStatus?
     @ObservationIgnored private var tickTask: Task<Void, Never>?
-    @ObservationIgnored private var proxyHost: String?
-    @ObservationIgnored private var proxyPort: UInt16?
     /// A session ended by the listener (Stop Casting) rather than lost.
     @ObservationIgnored private var endingOnPurpose = false
 
@@ -132,8 +130,6 @@ final class CastManager: NSObject {
         tickTask = nil
         CastProxyServer.shared.stop()
         CastBackgroundKeeper.stop()
-        proxyHost = nil
-        proxyPort = nil
         if let error, !endingOnPurpose, (error as NSError).code != GCKErrorCode.cancelled.rawValue {
             castLog.error("session ended: \(String(describing: error), privacy: .public)")
             AppState.current?.showToast("Lost the connection to \(name). Playing on this iPhone.")
@@ -238,12 +234,12 @@ final class CastManager: NSObject {
     // MARK: Proxy
 
     /// The proxy's address on the network, started if needed.
+    /// Asked again every time (both are cheap while the server runs): a listener that failed (the
+    /// network changed, iOS reclaimed the socket) is started again on a new port, and a new Wi-Fi
+    /// address is picked up, instead of handing the receiver a dead URL for the rest of the session.
     func proxyEndpoint() async throws -> (host: String, port: UInt16) {
-        if let proxyHost, let proxyPort { return (proxyHost, proxyPort) }
         guard let host = CastProxyServer.lanAddress() else { throw CastError.noNetwork }
         let port = try await CastProxyServer.shared.start()
-        proxyHost = host
-        proxyPort = port
         return (host, port)
     }
 
@@ -377,6 +373,7 @@ extension CastManager: @preconcurrency GCKSessionManagerListener {
     }
 
     func sessionManager(_ sessionManager: GCKSessionManager, didEnd session: GCKSession, withError error: Error?) {
+        session.remoteMediaClient?.remove(self)
         sessionEnded(error: error)
     }
 

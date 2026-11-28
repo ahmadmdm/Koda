@@ -16,11 +16,14 @@ final class ArtworkTint {
 
     func update(from url: URL?) async {
         // The same download and decode as the Now Playing artwork, which asks for this cover too.
-        guard let url, let image = await ArtworkLoader.shared.fullImage(url) else { return }
+        // The caller's `.task(id:)` is cancelled when the song changes: a cover that arrives late must
+        // not replace the next song's colours.
+        guard let url, let image = await ArtworkLoader.shared.fullImage(url), !Task.isCancelled else { return }
         self.image = image
         let extracted = await Task.detached(priority: .utility) { [context] in
             Self.extract(image, context: context)
         }.value
+        guard !Task.isCancelled else { return }
         withAnimation(.easeInOut(duration: 0.6)) {
             colors = extracted
             color = extracted.first

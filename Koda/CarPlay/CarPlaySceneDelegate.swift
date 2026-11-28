@@ -40,6 +40,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private var lastHomeState = ""
     private var lastLibraryState = ""
     private var lastButtonState = ""
+    /// Bumped on every connect, so an observation loop from an earlier connection ends instead of
+    /// running alongside the new one.
+    private var observation = 0
 
     // MARK: Connection
 
@@ -59,7 +62,8 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         configureNowPlaying()
         loadHomeRemote()
         loadExplore()
-        observe()
+        observation += 1
+        observe(observation)
     }
 
     func templateApplicationScene(_ scene: CPTemplateApplicationScene, didDisconnectInterfaceController interfaceController: CPInterfaceController) {
@@ -73,14 +77,14 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
     /// Rebuilds whatever changed in the library or the player, then watches again. Each screen
     /// compares a small signature first, so the frequent play-time updates cost almost nothing.
-    private func observe() {
-        guard tabBar != nil else { return }
+    private func observe(_ generation: Int) {
+        guard tabBar != nil, generation == observation else { return }
         withObservationTracking {
             refreshHome()
             refreshLibraryTabs()
             refreshNowPlayingButtons()
         } onChange: { [weak self] in
-            Task { @MainActor in self?.observe() }
+            Task { @MainActor in self?.observe(generation) }
         }
     }
 
@@ -620,6 +624,8 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         let elements = row.elements
         Task { [weak row] in
             for (element, url) in zip(elements, urls) {
+                // The row was replaced (or CarPlay went away): stop downloading its covers.
+                guard row != nil else { return }
                 if let image = await CarPlayArtwork.image(url) { element.image = image }
             }
             // Assigning the elements again makes a row on screen reload, once for all the covers.
@@ -777,8 +783,15 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     }
 
     private func showNowPlaying() {
-        guard let controller = interfaceController, controller.topTemplate !== CPNowPlayingTemplate.shared else { return }
-        controller.pushTemplate(CPNowPlayingTemplate.shared, animated: true, completion: nil)
+        let np = CPNowPlayingTemplate.shared
+        guard let controller = interfaceController, controller.topTemplate !== np else { return }
+        // Already in the stack (a page opened from Now Playing's album/artist button): go back to
+        // it, since pushing a template that is already on the stack raises an exception.
+        if controller.templates.contains(where: { $0 === np }) {
+            controller.pop(to: np, animated: true, completion: nil)
+        } else {
+            controller.pushTemplate(np, animated: true, completion: nil)
+        }
     }
 
     nonisolated func nowPlayingTemplateUpNextButtonTapped(_ nowPlayingTemplate: CPNowPlayingTemplate) {

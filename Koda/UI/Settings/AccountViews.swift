@@ -101,6 +101,7 @@ struct GoogleSignInView: View {
                     Menu {
                         Button("Paste session cookies…", systemImage: "doc.on.clipboard") { showPaste = true }
                     } label: { Image(systemName: "ellipsis") }
+                    .accessibilityLabel("More")
                 }
             }
             .sheet(isPresented: $showPaste) { PasteCookiesView { ok in showPaste = false; if ok { onDone(true) } } }
@@ -127,7 +128,7 @@ struct SignInWebView: UIViewRepresentable {
         return web
     }
 
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    func updateUIView(_ uiView: WKWebView, context: Context) { context.coordinator.parent = self }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         var parent: SignInWebView
@@ -135,6 +136,10 @@ struct SignInWebView: UIViewRepresentable {
         init(_ parent: SignInWebView) { self.parent = parent }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { parent.loading = true }
+
+        // Offline or a blocked page: without these the spinner stayed over the error page.
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) { parent.loading = false }
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) { parent.loading = false }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parent.loading = false

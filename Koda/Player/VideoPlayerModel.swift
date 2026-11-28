@@ -111,6 +111,10 @@ final class VideoPlayerModel {
     @ObservationIgnored private var resumeAt: Double = 0
     @ObservationIgnored private var lastProgressSave = Date.distantPast
     @ObservationIgnored private var lifecycleObservers: [NSObjectProtocol] = []
+    /// The SponsorBlock segment just skipped, and when: the seek is asynchronous, so the next ticks
+    /// can still fall inside it.
+    @ObservationIgnored private var lastSkip: (end: Double, at: Date)?
+    @ObservationIgnored private var noticeTask: Task<Void, Never>?
 
     var library: LibraryStore { .shared }
 
@@ -161,6 +165,15 @@ final class VideoPlayerModel {
         open(video, queue: queue, fromUserQueue: false)
     }
 
+    /// Reloads the current video after an error, keeping whether it came from the user's queue.
+    func retry() {
+        guard let video = current else { return }
+        let fromUserQueue = playingFromUserQueue
+        let autoQueue = queue
+        close()
+        open(video, queue: autoQueue, fromUserQueue: fromUserQueue)
+    }
+
     private func open(_ video: Video, queue: [Video], fromUserQueue: Bool) {
         NowPlayingOwner.claim(.video)
         MusicPlayer.shared.pause()
@@ -177,7 +190,12 @@ final class VideoPlayerModel {
         errorMessage = nil
         audioTracks = []
         selectedAudio = nil
+        // The previous video's renditions and subtitles belong to its item, not this one's.
+        audibleGroup = nil
+        audibleOptions = [:]
         captionTracks = []
+        if selectedCaption != nil { selectedCaption = nil }
+        lastSkip = nil
         cues = []
         currentCaption = nil
         if !queue.isEmpty { self.queue = queue.filter { $0.id != video.id } }
@@ -193,6 +211,9 @@ final class VideoPlayerModel {
         trackingId = nil
         if isCasting { CastManager.shared.stopMedia() }
         castTask?.cancel()
+        // A load still running would otherwise put the closed video's item back in the player.
+        loadTask?.cancel()
+        isLoading = false
         player.pause()
         player.replaceCurrentItem(with: nil)
         current = nil
@@ -280,6 +301,7 @@ final class VideoPlayerModel {
                     let asset = AVURLAsset(url: local)
                     let item = AVPlayerItem(asset: asset)
                     item.externalMetadata = Self.metadata(title: video.title, artist: video.channel)
+                    guard !Task.isCancelled, current?.id == video.id else { return }
                     player.replaceCurrentItem(with: item)
                     await loadAudioTracks(item, originalLanguage: nil)
                     let duration = (try? await asset.load(.duration).seconds) ?? 0
@@ -400,9 +422,18 @@ final class VideoPlayerModel {
     private func skipSponsorSegment(at t: Double) {
         guard !segments.isEmpty, UserDefaults.standard.object(forKey: "sponsorBlock") as? Bool ?? true else { return }
         if let seg = segments.first(where: { t >= $0.start && t < $0.end - 0.5 }) {
+            // The seek to this segment's end is still under way: don't seek and announce it again.
+            if let last = lastSkip, last.end == seg.end, Date.now.timeIntervalSince(last.at) < 2 { return }
+            lastSkip = (seg.end, .now)
             seek(to: seg.end)
             skippedNotice = String(localized: "Skipped \(seg.category.replacingOccurrences(of: "_", with: " "))")
-            Task { try? await Task.sleep(for: .seconds(2.5)); skippedNotice = nil }
+            // Only the newest notice clears it, so a second skip's notice shows its full time.
+            noticeTask?.cancel()
+            noticeTask = Task {
+                try? await Task.sleep(for: .seconds(2.5))
+                guard !Task.isCancelled else { return }
+                skippedNotice = nil
+            }
         }
     }
 

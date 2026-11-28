@@ -30,6 +30,8 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
     private var waiting: [CheckedContinuation<UInt16, Error>] = []
     private var files: [String: URL] = [:]
     private var connections: [ObjectIdentifier: NWConnection] = [:]
+    /// Connections whose request head hasn't arrived yet.
+    private var awaitingHead: Set<ObjectIdentifier> = []
 
     init(configuration: URLSessionConfiguration = .default) {
         let config = configuration
@@ -58,7 +60,12 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
                     parameters.allowLocalEndpointReuse = true
                     let listener = try NWListener(using: parameters, on: .any)
                     listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-                    listener.stateUpdateHandler = { [weak self] state in self?.listenerChanged(state) }
+                    // A stopped or failed listener's last states arrive after its replacement may have
+                    // started: only the current one may change `port`.
+                    listener.stateUpdateHandler = { [weak self, weak listener] state in
+                        guard let self, let listener, listener === self.listener else { return }
+                        self.listenerChanged(state)
+                    }
                     self.listener = listener
                     listener.start(queue: queue)
                 } catch {
@@ -75,7 +82,10 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
             port = nil
             for c in connections.values { c.cancel() }
             connections = [:]
+            awaitingHead = []
             files = [:]
+            // A `start()` still waiting for the stopped listener would otherwise never return.
+            finishWaiting(.failure(CancellationError()))
         }
     }
 
@@ -91,7 +101,9 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
             port = nil
             finishWaiting(.failure(error))
         case .cancelled:
+            listener = nil
             port = nil
+            finishWaiting(.failure(CancellationError()))
         default:
             break
         }
@@ -192,11 +204,19 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
             case .failed, .cancelled:
                 // Handlers run on `queue`, where the table lives.
                 self?.connections[id] = nil
+                self?.awaitingHead.remove(id)
                 if case .failed = state { connection?.cancel() }
             default: break
             }
         }
         connection.start(queue: queue)
+        awaitingHead.insert(id)
+        // A client that connects and never sends a request would otherwise hold its connection
+        // (and a pending receive) until the server stops.
+        queue.asyncAfter(deadline: .now() + 30) { [weak self, weak connection] in
+            guard let self, self.awaitingHead.remove(id) != nil else { return }
+            connection?.cancel()
+        }
         receiveHeader(connection, buffer: Data())
     }
 
@@ -207,6 +227,7 @@ nonisolated final class CastProxyServer: @unchecked Sendable {
             if let data { buffer.append(data) }
             if let end = buffer.range(of: Data("\r\n\r\n".utf8)) {
                 let head = String(decoding: buffer[..<end.lowerBound], as: UTF8.self)
+                self.awaitingHead.remove(ObjectIdentifier(connection))
                 self.handle(HTTPRequest(head: head), on: connection)
             } else if error != nil || isComplete || buffer.count > 64 * 1024 {
                 connection.cancel()

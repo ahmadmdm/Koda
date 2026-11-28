@@ -141,6 +141,7 @@ final class Scrobbler {
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var flushing = false
     @ObservationIgnored private var retryAfter = Date.distantPast
+    @ObservationIgnored private var queueWrite: Task<Void, Never>?
 
     // The listen being measured.
     @ObservationIgnored private var occurrence: String?
@@ -327,7 +328,11 @@ final class Scrobbler {
         pendingCount = queue.count
         let snapshot = queue
         let url = Self.queueURL
-        Task.detached(priority: .utility) {
+        // One write at a time, in order: detached writes racing each other could leave an older
+        // queue on disk, so sent scrobbles would be sent again (or new ones lost) after a relaunch.
+        let previous = queueWrite
+        queueWrite = Task.detached(priority: .utility) {
+            await previous?.value
             if let data = try? JSONEncoder().encode(snapshot) { try? data.write(to: url, options: .atomic) }
         }
     }

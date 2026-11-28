@@ -27,6 +27,23 @@ nonisolated struct Song: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+/// `isVideo` came later than the rest: a stored song without it is not a video. (Synthesized
+/// decoding would reject the whole library over the missing key.)
+nonisolated extension Song {
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(String.self, forKey: .id),
+                  title: try c.decode(String.self, forKey: .title),
+                  artist: try c.decode(String.self, forKey: .artist),
+                  artistId: try c.decodeIfPresent(String.self, forKey: .artistId),
+                  album: try c.decodeIfPresent(String.self, forKey: .album),
+                  albumId: try c.decodeIfPresent(String.self, forKey: .albumId),
+                  duration: try c.decodeIfPresent(Int.self, forKey: .duration),
+                  thumbnail: try c.decodeIfPresent(String.self, forKey: .thumbnail),
+                  isVideo: try c.decodeIfPresent(Bool.self, forKey: .isVideo) ?? false)
+    }
+}
+
 nonisolated enum MusicKind: String, Codable, Sendable {
     case song, video, album, artist, playlist
 }
@@ -96,6 +113,24 @@ nonisolated struct Video: Codable, Hashable, Identifiable, Sendable {
     var asSong: Song {
         Song(id: id, title: title, artist: channel, artistId: channelId, duration: durationText?.durationSeconds,
              thumbnail: thumbnail ?? "https://i.ytimg.com/vi/\(id)/hqdefault.jpg", isVideo: true)
+    }
+}
+
+/// As with `Song`: a stored video without `isLive` is not live.
+nonisolated extension Video {
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(String.self, forKey: .id),
+                  title: try c.decode(String.self, forKey: .title),
+                  channel: try c.decode(String.self, forKey: .channel),
+                  channelId: try c.decodeIfPresent(String.self, forKey: .channelId),
+                  channelAvatar: try c.decodeIfPresent(String.self, forKey: .channelAvatar),
+                  thumbnail: try c.decodeIfPresent(String.self, forKey: .thumbnail),
+                  durationText: try c.decodeIfPresent(String.self, forKey: .durationText),
+                  views: try c.decodeIfPresent(String.self, forKey: .views),
+                  published: try c.decodeIfPresent(String.self, forKey: .published),
+                  isLive: try c.decodeIfPresent(Bool.self, forKey: .isLive) ?? false,
+                  publishedDate: try c.decodeIfPresent(Date.self, forKey: .publishedDate))
     }
 }
 

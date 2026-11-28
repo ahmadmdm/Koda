@@ -200,11 +200,22 @@ enum DownloadActivitySync {
     /// Keeps Koda awake until the system has the update: it may be on its way to suspension.
     private static func track(_ work: @escaping @MainActor () async -> Void) {
         let previous = sending
-        let background = UIApplication.shared.beginBackgroundTask(withName: "Download Live Activity")
+        // Without an expiration handler that ends it, an assertion that outlives its time gets Koda killed.
+        let background = BackgroundTask()
+        background.id = UIApplication.shared.beginBackgroundTask(withName: "Download Live Activity") { background.end() }
         sending = Task {
             await previous?.value
             await work()
-            UIApplication.shared.endBackgroundTask(background)
+            background.end()
+        }
+    }
+
+    private final class BackgroundTask {
+        var id: UIBackgroundTaskIdentifier = .invalid
+        func end() {
+            guard id != .invalid else { return }
+            UIApplication.shared.endBackgroundTask(id)
+            id = .invalid
         }
     }
 

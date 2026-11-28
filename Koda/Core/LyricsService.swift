@@ -17,7 +17,7 @@ enum LyricsService {
         return result
     }
 
-    private static func cleanTitle(_ title: String) -> String {
+    nonisolated private static func cleanTitle(_ title: String) -> String {
         var t = title
         for pattern in [#"\s*[\(\[][^\)\]]*(official|video|lyric|audio|visualizer|mv|hd|4k)[^\)\]]*[\)\]]"#, #"\s*\|.*$"#] {
             t = t.replacingOccurrences(of: pattern, with: "", options: [.regularExpression, .caseInsensitive])
@@ -25,7 +25,8 @@ enum LyricsService {
         return t.trimmingCharacters(in: .whitespaces)
     }
 
-    private static func lrclib(song: Song, duration: Double?) async -> Lyrics? {
+    /// Off the main actor: JSON and LRC parsing of a whole song's lyrics.
+    @concurrent nonisolated private static func lrclib(song: Song, duration: Double?) async -> Lyrics? {
         let artist = song.artist.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? song.artist
         var comps = URLComponents(string: "https://lrclib.net/api/get")!
         comps.queryItems = [.init(name: "track_name", value: cleanTitle(song.title)), .init(name: "artist_name", value: artist)]
@@ -48,7 +49,7 @@ enum LyricsService {
         return nil
     }
 
-    private static func fetch(_ url: URL?) async -> J? {
+    nonisolated private static func fetch(_ url: URL?) async -> J? {
         guard let url else { return nil }
         var request = URLRequest(url: url)
         request.setValue("Koda iOS (https://github.com/Ivorisnoob/Koda)", forHTTPHeaderField: "User-Agent")
@@ -57,7 +58,7 @@ enum LyricsService {
         return J(data: data)
     }
 
-    static func parseLRC(_ text: String) -> [LyricLine] {
+    nonisolated static func parseLRC(_ text: String) -> [LyricLine] {
         var lines: [LyricLine] = []
         let regex = try! NSRegularExpression(pattern: #"\[(\d+):(\d+(?:\.\d+)?)\]"#)
         for raw in text.components(separatedBy: .newlines) {

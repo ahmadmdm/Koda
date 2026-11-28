@@ -17,7 +17,8 @@ struct QueueView: View {
                     }
                 }
                 Section {
-                    ForEach(Array(player.upNext.enumerated()), id: \.element.id) { i, song in
+                    // By position: a queue started from a playlist can hold the same song twice.
+                    ForEach(Array(player.upNext.enumerated()), id: \.offset) { i, song in
                         SongRow(song: song) { player.jump(toUpNext: i) }
                     }
                     .onMove { player.move(from: $0, to: $1) }
@@ -86,9 +87,12 @@ struct LyricsPanel: View {
         }
         .frame(maxHeight: .infinity)
         .task(id: player.current?.id) {
-            guard let song = player.current else { return }
+            guard let song = player.current else { lyrics = nil; loading = false; return }
             loading = true
-            lyrics = await LyricsService.lyrics(for: song, duration: player.duration > 0 ? player.duration : nil)
+            let found = await LyricsService.lyrics(for: song, duration: player.duration > 0 ? player.duration : nil)
+            // The song changed while this was loading: the newer task shows its own lyrics.
+            guard !Task.isCancelled else { return }
+            lyrics = found
             loading = false
         }
     }

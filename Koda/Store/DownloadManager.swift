@@ -66,6 +66,11 @@ final class DownloadManager {
             let bytes = try await Self.fetchRanged(url, userAgent: InnerTube.userAgent(for: url), progress: { progress in
                 Task { @MainActor in if self.active[song.id] != nil { self.active[song.id] = .downloading(progress) } }
             }, to: target)
+            // Cancelled (or replaced by a newer download of this song) while the last bytes arrived.
+            guard tasks[song.id]?.token == token, !Task.isCancelled else {
+                if tasks[song.id] == nil { try? FileManager.default.removeItem(at: target) }
+                return
+            }
             var saved = song
             if saved.duration == nil, info.duration > 0 { saved.duration = Int(info.duration) }
             library.data.downloads.removeAll { $0.song.id == song.id }
@@ -75,7 +80,6 @@ final class DownloadManager {
         } catch {
             // A cancelled request throws URLError.cancelled rather than CancellationError.
             let cancelled = Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled
-            if cancelled { try? FileManager.default.removeItem(at: target.appendingPathExtension("part")) }
             // A newer download of this song (after a cancel and a new start) owns its state now.
             guard tasks[song.id]?.token == token else { return }
             active[song.id] = cancelled ? nil : .failed(error.localizedDescription)
@@ -83,9 +87,22 @@ final class DownloadManager {
         if tasks[song.id]?.token == token { tasks[song.id] = nil }
     }
 
-    nonisolated static func fetchRanged(_ url: URL, userAgent: String = InnerTube.visionUA, progress: @Sendable @escaping (Double) -> Void, to target: URL) async throws -> Int64 {
-        let partial = target.appendingPathExtension("part")
+    /// `@concurrent`: a plain nonisolated async function runs on its caller's actor (the main one
+    /// here), and the 4 MB writes would block it. Each fetch writes its own partial file, removed on
+    /// any failure, so a cancelled fetch never deletes the file of a newer one for the same target.
+    @concurrent nonisolated static func fetchRanged(_ url: URL, userAgent: String = InnerTube.visionUA, progress: @Sendable @escaping (Double) -> Void, to target: URL) async throws -> Int64 {
+        let partial = target.appendingPathExtension("\(UUID().uuidString).part")
         FileManager.default.createFile(atPath: partial.path, contents: nil)
+        do {
+            return try await fetchRanged(url, userAgent: userAgent, progress: progress, partial: partial, to: target)
+        } catch {
+            try? FileManager.default.removeItem(at: partial)
+            throw error
+        }
+    }
+
+    @concurrent nonisolated private static func fetchRanged(_ url: URL, userAgent: String, progress: @Sendable @escaping (Double) -> Void,
+                                                            partial: URL, to target: URL) async throws -> Int64 {
         let handle = try FileHandle(forWritingTo: partial)
         defer { try? handle.close() }
         let chunk: Int64 = 4 * 1024 * 1024
@@ -108,7 +125,9 @@ final class DownloadManager {
             if http.statusCode == 200 { total = offset }
             progress(Double(offset) / Double(max(total ?? offset, 1)))
             if data.isEmpty { break }
-        } while offset < (total ?? 0)
+            // No Content-Range to go by: a full chunk means there may be more.
+            if total == nil, Int64(data.count) < chunk { total = offset }
+        } while offset < (total ?? .max)
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: partial, to: target)
         return offset

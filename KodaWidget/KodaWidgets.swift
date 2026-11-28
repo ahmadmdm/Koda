@@ -34,7 +34,8 @@ struct NowPlayingProvider: TimelineProvider {
         var entries = [entry]
         // While a song plays, show it stopped once it should have ended: the app reloads on every
         // change, so a song still "playing" past its end means the app was closed.
-        if let snapshot = entry.snapshot, snapshot.isPlaying {
+        // An unknown length (0) gives no end to wait for.
+        if let snapshot = entry.snapshot, snapshot.isPlaying, snapshot.duration > 0 {
             entries.append(NowPlayingEntry(date: snapshot.endDate, snapshot: Self.stopped(snapshot), artwork: entry.artwork))
         }
         completion(Timeline(entries: entries, policy: .after(.now.addingTimeInterval(3600))))
@@ -42,7 +43,7 @@ struct NowPlayingProvider: TimelineProvider {
 
     private func current() -> NowPlayingEntry? {
         guard var snapshot = NowPlayingSnapshot.load() else { return nil }
-        if snapshot.isPlaying, Date.now > snapshot.endDate { snapshot = Self.stopped(snapshot) }
+        if snapshot.isPlaying, snapshot.duration > 0, Date.now > snapshot.endDate { snapshot = Self.stopped(snapshot) }
         // Only the artwork of this song: the file may still hold the previous song's.
         let artwork = snapshot.hasArtwork ? NowPlayingSnapshot.artworkURL.flatMap { UIImage(contentsOfFile: $0.path) } : nil
         return NowPlayingEntry(date: .now, snapshot: snapshot, artwork: artwork)
@@ -185,6 +186,16 @@ struct ControlButton: View {
         }
         .buttonStyle(.plain)
         .widgetAccentable(prominent)
+        .accessibilityLabel(label)
+    }
+
+    /// VoiceOver reads the intent's name, not the symbol's.
+    private var label: LocalizedStringKey {
+        switch systemImage {
+        case "backward.fill": "Previous Song"
+        case "forward.fill": "Next Song"
+        default: "Play or Pause"
+        }
     }
 }
 
@@ -257,6 +268,8 @@ struct MediumView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(-8)
+                    .accessibilityLabel("Like Song")
+                    .accessibilityAddTraits(snapshot.isLiked ? .isSelected : [])
                 }
                 Spacer(minLength: 0)
                 SongProgress(snapshot: snapshot)
@@ -330,6 +343,7 @@ struct CircularView: View {
             .gaugeStyle(.accessoryCircularCapacity)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Play or Pause")
     }
 }
 

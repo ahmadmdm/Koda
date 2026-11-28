@@ -57,7 +57,7 @@ final class MediaExporter {
                 return output
             }
             let ext = source.pathExtension.isEmpty ? "m4a" : source.pathExtension
-            return try Self.copy(source, to: folder.appendingPathComponent(Self.fileName(title, fallback: "Video", ext: ext)))
+            return try await Self.copy(source, to: folder.appendingPathComponent(Self.fileName(title, fallback: "Video", ext: ext)))
         }
     }
 
@@ -70,7 +70,7 @@ final class MediaExporter {
         start(title: song.title, destination: .files) { _ in
             let folder = try Self.makeJobFolder()
             let ext = source.pathExtension.isEmpty ? "m4a" : source.pathExtension
-            return try Self.copy(source, to: folder.appendingPathComponent(Self.fileName(song.title, fallback: "Song", ext: ext)))
+            return try await Self.copy(source, to: folder.appendingPathComponent(Self.fileName(song.title, fallback: "Song", ext: ext)))
         }
     }
 
@@ -199,7 +199,8 @@ final class MediaExporter {
         return folder
     }
 
-    nonisolated private static func copy(_ source: URL, to target: URL) throws -> URL {
+    /// `@concurrent`: the job closure runs on its caller's actor, the main one, and a video can be gigabytes.
+    @concurrent nonisolated private static func copy(_ source: URL, to target: URL) async throws -> URL {
         try FileManager.default.copyItem(at: source, to: target)
         return target
     }

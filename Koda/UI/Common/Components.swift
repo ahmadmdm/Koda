@@ -178,6 +178,7 @@ struct SongRow: View {
                     Image(systemName: "ellipsis").font(.body).foregroundStyle(.secondary)
                         .frame(width: 32, height: 44).contentShape(Rectangle())
                 }
+                .accessibilityLabel("More")
             }
             .contentShape(Rectangle())
         }
@@ -233,7 +234,9 @@ struct SongMenuItems: View {
             if let artistId = song.artistId { Button("Go to Artist", systemImage: "music.microphone") { app.navigate(.artist(artistId)) } }
             if let albumId = song.albumId { Button("Go to Album", systemImage: "square.stack") { app.navigate(.album(albumId)) } }
             if !song.isLocal {
-                ShareLink(item: URL(string: "https://music.youtube.com/watch?v=\(song.id)")!) { Label("Share", systemImage: "square.and.arrow.up") }
+                if let url = URL(string: "https://music.youtube.com/watch?v=\(song.id)") {
+                    ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
+                }
             }
         }
     }

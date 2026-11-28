@@ -156,8 +156,10 @@ final class MusicPlayer {
 
     // MARK: Queue control
 
-    func play(_ songs: [Song], startAt: Int = 0, shuffled: Bool = false, radio: Bool = false) {
+    func play(_ songs: [Song], startAt requested: Int = 0, shuffled: Bool = false, radio: Bool = false) {
         guard !songs.isEmpty else { return }
+        // An index from a list that changed meanwhile must not crash the player.
+        let startAt = min(max(requested, 0), songs.count - 1)
         playbackLog.info("play \(songs[startAt].id, privacy: .public) \(songs[startAt].title, privacy: .public) radio=\(radio)")
         commitListening()
         var list = songs
@@ -203,6 +205,7 @@ final class MusicPlayer {
     }
 
     func move(from source: IndexSet, to destination: Int) {
+        guard current != nil else { return }
         // Offsets are relative to `upNext`.
         var next = upNext
         next.move(fromOffsets: source, toOffset: destination)
@@ -211,6 +214,7 @@ final class MusicPlayer {
     }
 
     func removeFromUpNext(at offsets: IndexSet) {
+        guard current != nil else { return }
         var next = upNext
         next.remove(atOffsets: offsets)
         queue = Array(queue[...index]) + next
@@ -226,7 +230,11 @@ final class MusicPlayer {
         saveSession()
     }
 
-    func clearUpNext() { queue = Array(queue[...index]); saveSession() }
+    func clearUpNext() {
+        guard current != nil else { return }
+        queue = Array(queue[...index])
+        saveSession()
+    }
 
     // MARK: Transport
 
@@ -478,7 +486,8 @@ final class MusicPlayer {
         // Expired URLs are never used again: drop them, so a long radio session doesn't keep them all.
         if resolved.count > 50 { resolved = resolved.filter { $0.value.expires > .now } }
         resolved[song.id] = (url, info.loudnessDb, Date().addingTimeInterval(5 * 3600))
-        if let i = queue.firstIndex(where: { $0.id == song.id }), info.duration > 0 {
+        // Only when it differs: writing `queue` re-saves the session and redraws Up Next.
+        if let i = queue.firstIndex(where: { $0.id == song.id }), info.duration > 0, queue[i].duration != Int(info.duration) {
             queue[i].duration = Int(info.duration)
             if current?.id == song.id { duration = info.duration }
         }
@@ -531,19 +540,22 @@ final class MusicPlayer {
         player.volume = Float(min(1, pow(10, -loudness / 20)))
     }
 
-    private func extendWithRadio(seed: String?, thenAdvance: Bool = false) async {
-        guard radioEnabled, let seed, !seed.hasPrefix(LocalMusicLibrary.idPrefix) else { return }
+    /// True when it added songs to the queue.
+    @discardableResult
+    private func extendWithRadio(seed: String?, thenAdvance: Bool = false) async -> Bool {
+        guard radioEnabled, let seed, !seed.hasPrefix(LocalMusicLibrary.idPrefix) else { return false }
         let generation = queueGeneration
-        guard let songs = try? await MusicAPI.radio(for: seed) else { return }
+        guard let songs = try? await MusicAPI.radio(for: seed) else { return false }
         // The listener may have picked something else, or moved on, while the radio loaded.
-        guard generation == queueGeneration, current?.id == seed else { return }
-        if thenAdvance, index != queue.count - 1 { return }
+        guard generation == queueGeneration, current?.id == seed else { return false }
+        if thenAdvance, index != queue.count - 1 { return false }
         let existing = Set(queue.map(\.id))
         let fresh = songs.filter { !existing.contains($0.id) }
-        guard !fresh.isEmpty else { return }
+        guard !fresh.isEmpty else { return false }
         queue += fresh
         if thenAdvance { index += 1; load(autoplay: true) }
         saveSession()
+        return true
     }
 
     private func trackEnded() {
@@ -556,8 +568,16 @@ final class MusicPlayer {
             return
         }
         if index + 1 >= queue.count, repeatMode != .all {
-            Task { await extendWithRadio(seed: current?.id, thenAdvance: true) }
-            if !radioEnabled || current?.isLocal == true { isPlaying = false }
+            // The end of the queue: stop here (a file running past its stated length would otherwise
+            // keep playing and end the track again on every tick), and go on only if the radio adds more.
+            if !isCasting { player.pause() }
+            let endedId = current?.id
+            Task {
+                guard !(await extendWithRadio(seed: endedId, thenAdvance: true)), current?.id == endedId, !isLoading else { return }
+                isPlaying = false
+                wantsPlayback = false
+                updateNowPlaying()
+            }
             return
         }
         next()
@@ -640,7 +660,7 @@ final class MusicPlayer {
         guard let data = UserDefaults.standard.data(forKey: "sessionQueue"),
               let saved = try? JSONDecoder().decode([Song].self, from: data), !saved.isEmpty else { return }
         queue = saved
-        index = min(UserDefaults.standard.integer(forKey: "sessionIndex"), saved.count - 1)
+        index = min(max(UserDefaults.standard.integer(forKey: "sessionIndex"), 0), saved.count - 1)
         currentTime = UserDefaults.standard.double(forKey: "sessionPosition")
         duration = Double(current?.duration ?? 0)
         syncCurrentId()

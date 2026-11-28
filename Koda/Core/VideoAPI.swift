@@ -213,7 +213,8 @@ nonisolated enum VideoAPI {
     }
 
     @concurrent static func suggestions(_ query: String) async -> [String] {
-        guard let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+        // `.urlQueryAllowed` leaves `&`, `=` and `+` as they are, so "a&b" or "c++" would break the query.
+        guard let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed.subtracting(CharacterSet(charactersIn: "&=+?/"))),
               let url = URL(string: "https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&xhr=t&oe=utf-8&hl=\(api.language)&gl=\(api.region)&q=\(q)"),
               let (data, _) = try? await URLSession.shared.data(from: url) else { return [] }
         return parseSuggestions(data)
@@ -269,12 +270,18 @@ nonisolated enum VideoAPI {
 
     /// Shorts comments page through `browse` rather than `next`.
     @concurrent static func comments(token: String, endpoint: String = "next") async throws -> ([Comment], String?) {
-        let root = try await api.web(endpoint, ["continuation": token])
-        let (comments, tokens) = parseComments(root)
-        if comments.isEmpty, let first = tokens.first, first != token {
-            return try await self.comments(token: first, endpoint: endpoint)
+        var token = token
+        var visited: Set<String> = [token]
+        while true {
+            let root = try await api.web(endpoint, ["continuation": token])
+            let (comments, tokens) = parseComments(root)
+            // The first page's real list token; a page that leads back to one already read ends here.
+            if comments.isEmpty, let first = tokens.first, visited.insert(first).inserted, visited.count <= 4 {
+                token = first
+                continue
+            }
+            return (comments, tokens.last)
         }
-        return (comments, tokens.last)
     }
 
     /// The comments on a page, and its continuation tokens in document order.
